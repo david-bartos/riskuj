@@ -14,8 +14,18 @@ export type GameStorageOptions = {
 
 const defaultGamesDir = path.resolve(process.cwd(), "data/games");
 const gameJsonFilename = "game.json";
+const gameIdPattern = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
+
+function validateGameId(id: string) {
+  if (!gameIdPattern.test(id)) {
+    throw new Error(
+      "Invalid game: id must contain only letters, numbers, underscores or hyphens",
+    );
+  }
+}
 
 function gameDirPath(gamesDir: string, id: string) {
+  validateGameId(id);
   return path.join(gamesDir, id);
 }
 
@@ -59,6 +69,7 @@ export function validateGame(value: unknown): Game {
   const game = value as Partial<Game>;
 
   requireString(game.id, "id");
+  validateGameId(game.id);
   requireString(game.title, "title");
 
   if (!Array.isArray(game.categories)) {

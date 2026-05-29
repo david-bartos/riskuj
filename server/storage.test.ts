@@ -127,6 +127,20 @@ describe("game storage", () => {
     );
   });
 
+
+  it("odmitne game id, ktere neni bezpecny nazev adresare", async () => {
+    const gamesDir = await createTempGamesDir();
+    const storage = createGameStorage({ gamesDir });
+    const invalidGame = createValidGame({ id: "../utek" });
+
+    await expect(storage.saveGame(invalidGame)).rejects.toThrow(
+      "Invalid game: id must contain only letters, numbers, underscores or hyphens",
+    );
+    await expect(storage.loadGame("../utek")).rejects.toThrow(
+      "Invalid game: id must contain only letters, numbers, underscores or hyphens",
+    );
+  });
+
   it("validuje volitelne moderatorNote a audio metadata", async () => {
     const gamesDir = await createTempGamesDir();
     const storage = createGameStorage({ gamesDir });
