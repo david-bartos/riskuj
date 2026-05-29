@@ -35,5 +35,5 @@ export interface GameSessionState {
   currentQuestionId?: string;
   teamScores: Record<string, number>;
   activeTeamId?: string;
-  isFinalized: boolean;
+  isFinished: boolean;
 }

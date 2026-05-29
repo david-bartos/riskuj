@@ -45,7 +45,7 @@ describe("game storage", () => {
 
     await expect(storage.saveGame(game)).resolves.toEqual(game);
 
-    const savedJson = await readFile(join(gamesDir, "test-game.json"), "utf8");
+    const savedJson = await readFile(join(gamesDir, "test-game", "game.json"), "utf8");
     expect(JSON.parse(savedJson)).toEqual(game);
     expect(savedJson.endsWith("\n")).toBe(true);
 
@@ -66,9 +66,11 @@ describe("game storage", () => {
     const secondGame = createValidGame({ id: "b-game", title: "B Game" });
 
     await mkdir(gamesDir, { recursive: true });
-    await writeFile(join(gamesDir, "b-game.json"), JSON.stringify(secondGame), "utf8");
+    await mkdir(join(gamesDir, "b-game"), { recursive: true });
+    await mkdir(join(gamesDir, "a-game"), { recursive: true });
+    await writeFile(join(gamesDir, "b-game", "game.json"), JSON.stringify(secondGame), "utf8");
     await writeFile(join(gamesDir, "notes.txt"), "ignore me", "utf8");
-    await writeFile(join(gamesDir, "a-game.json"), JSON.stringify(firstGame), "utf8");
+    await writeFile(join(gamesDir, "a-game", "game.json"), JSON.stringify(firstGame), "utf8");
 
     await expect(storage.listGames()).resolves.toEqual([firstGame, secondGame]);
   });
@@ -97,7 +99,8 @@ describe("game storage", () => {
       categories: [{ id: "music", title: 123 as unknown as string }],
     });
 
-    await writeFile(join(gamesDir, "test-game.json"), JSON.stringify(invalidGame), "utf8");
+    await mkdir(join(gamesDir, "test-game"), { recursive: true });
+    await writeFile(join(gamesDir, "test-game", "game.json"), JSON.stringify(invalidGame), "utf8");
 
     await expect(storage.loadGame("test-game")).rejects.toThrow(
       "Invalid game: categories[0].title must be a string",
@@ -116,7 +119,8 @@ describe("game storage", () => {
       ],
     });
 
-    await writeFile(join(gamesDir, "test-game.json"), JSON.stringify(invalidGame), "utf8");
+    await mkdir(join(gamesDir, "test-game"), { recursive: true });
+    await writeFile(join(gamesDir, "test-game", "game.json"), JSON.stringify(invalidGame), "utf8");
 
     await expect(storage.loadGame("test-game")).rejects.toThrow(
       "Invalid game: questions[0].answer must be a string",
@@ -141,7 +145,8 @@ describe("game storage", () => {
       ],
     });
 
-    await writeFile(join(gamesDir, "test-game.json"), JSON.stringify(invalidGame), "utf8");
+    await mkdir(join(gamesDir, "test-game"), { recursive: true });
+    await writeFile(join(gamesDir, "test-game", "game.json"), JSON.stringify(invalidGame), "utf8");
 
     await expect(storage.loadGame("test-game")).rejects.toThrow(
       "Invalid game: questions[0].moderatorNote must be a string",

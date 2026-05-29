@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Game } from "../src/types/game";
 
@@ -13,9 +13,14 @@ export type GameStorageOptions = {
 };
 
 const defaultGamesDir = path.resolve(process.cwd(), "data/games");
+const gameJsonFilename = "game.json";
+
+function gameDirPath(gamesDir: string, id: string) {
+  return path.join(gamesDir, id);
+}
 
 function gameFilePath(gamesDir: string, id: string) {
-  return path.join(gamesDir, `${id}.json`);
+  return path.join(gameDirPath(gamesDir, id), gameJsonFilename);
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
@@ -71,10 +76,7 @@ export function validateGame(value: unknown): Game {
 
     const categoryRecord = category as unknown as Record<string, unknown>;
     requireString(categoryRecord.id, `categories[${index}].id`);
-    requireString(
-      categoryRecord.title,
-      `categories[${index}].title`,
-    );
+    requireString(categoryRecord.title, `categories[${index}].title`);
   });
 
   game.questions.forEach((question, index) => {
@@ -110,10 +112,10 @@ export function createGameStorage(options: GameStorageOptions = {}): GameStorage
 
   return {
     async listGames() {
-      let filenames: string[];
+      let entries: string[];
 
       try {
-        filenames = await readdir(gamesDir);
+        entries = await readdir(gamesDir);
       } catch (error) {
         if (isNodeError(error) && error.code === "ENOENT") {
           return [];
@@ -122,15 +124,19 @@ export function createGameStorage(options: GameStorageOptions = {}): GameStorage
         throw error;
       }
 
-      const games = await Promise.all(
-        filenames
-          .filter((filename) => filename.endsWith(".json"))
-          .sort()
-          .map(async (filename) => {
-            const json = await readFile(path.join(gamesDir, filename), "utf8");
-            return validateGame(JSON.parse(json));
-          }),
-      );
+      const games: Game[] = [];
+
+      for (const entry of entries.sort()) {
+        const entryPath = path.join(gamesDir, entry);
+        const entryStat = await stat(entryPath);
+
+        if (!entryStat.isDirectory()) {
+          continue;
+        }
+
+        const json = await readFile(path.join(entryPath, gameJsonFilename), "utf8");
+        games.push(validateGame(JSON.parse(json)));
+      }
 
       return games;
     },
@@ -150,10 +156,11 @@ export function createGameStorage(options: GameStorageOptions = {}): GameStorage
 
     async saveGame(game) {
       const validatedGame = validateGame(game);
-      await mkdir(gamesDir, { recursive: true });
+      await mkdir(gameDirPath(gamesDir, validatedGame.id), { recursive: true });
       await writeFile(
         gameFilePath(gamesDir, validatedGame.id),
-        `${JSON.stringify(validatedGame, null, 2)}\n`,
+        `${JSON.stringify(validatedGame, null, 2)}
+`,
         "utf8",
       );
       return validatedGame;
