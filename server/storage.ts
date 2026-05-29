@@ -37,7 +37,7 @@ function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error;
 }
 
-function requireString(value: unknown, field: string) {
+function requireString(value: unknown, field: string): asserts value is string {
   if (typeof value !== "string") {
     throw new Error(`Invalid game: ${field} must be a string`);
   }
