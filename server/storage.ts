@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Game } from "../src/types/game";
 
@@ -18,20 +18,43 @@ function gameFilePath(gamesDir: string, id: string) {
   return path.join(gamesDir, `${id}.json`);
 }
 
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
+}
+
+function requireString(value: unknown, field: string) {
+  if (typeof value !== "string") {
+    throw new Error(`Invalid game: ${field} must be a string`);
+  }
+}
+
+function validateAudio(value: unknown, field: string) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`Invalid game: ${field} must be an object`);
+  }
+
+  const audio = value as Record<string, unknown>;
+  requireString(audio.id, `${field}.id`);
+  requireString(audio.src, `${field}.src`);
+  requireString(audio.title, `${field}.title`);
+
+  if (
+    audio.durationSeconds !== undefined &&
+    typeof audio.durationSeconds !== "number"
+  ) {
+    throw new Error(`Invalid game: ${field}.durationSeconds must be a number`);
+  }
+}
+
 export function validateGame(value: unknown): Game {
-  if (!value || typeof value !== "object") {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Invalid game: expected object");
   }
 
   const game = value as Partial<Game>;
 
-  if (typeof game.id !== "string") {
-    throw new Error("Invalid game: id must be a string");
-  }
-
-  if (typeof game.title !== "string") {
-    throw new Error("Invalid game: title must be a string");
-  }
+  requireString(game.id, "id");
+  requireString(game.title, "title");
 
   if (!Array.isArray(game.categories)) {
     throw new Error("Invalid game: categories must be an array");
@@ -41,6 +64,44 @@ export function validateGame(value: unknown): Game {
     throw new Error("Invalid game: questions must be an array");
   }
 
+  game.categories.forEach((category, index) => {
+    if (!category || typeof category !== "object" || Array.isArray(category)) {
+      throw new Error(`Invalid game: categories[${index}] must be an object`);
+    }
+
+    const categoryRecord = category as unknown as Record<string, unknown>;
+    requireString(categoryRecord.id, `categories[${index}].id`);
+    requireString(
+      categoryRecord.title,
+      `categories[${index}].title`,
+    );
+  });
+
+  game.questions.forEach((question, index) => {
+    if (!question || typeof question !== "object" || Array.isArray(question)) {
+      throw new Error(`Invalid game: questions[${index}] must be an object`);
+    }
+
+    const questionRecord = question as unknown as Record<string, unknown>;
+    requireString(questionRecord.id, `questions[${index}].id`);
+    requireString(questionRecord.categoryId, `questions[${index}].categoryId`);
+    requireString(questionRecord.prompt, `questions[${index}].prompt`);
+    requireString(questionRecord.answer, `questions[${index}].answer`);
+
+    if (
+      questionRecord.moderatorNote !== undefined &&
+      typeof questionRecord.moderatorNote !== "string"
+    ) {
+      throw new Error(
+        `Invalid game: questions[${index}].moderatorNote must be a string`,
+      );
+    }
+
+    if (questionRecord.audio !== undefined) {
+      validateAudio(questionRecord.audio, `questions[${index}].audio`);
+    }
+  });
+
   return game as Game;
 }
 
@@ -49,7 +110,29 @@ export function createGameStorage(options: GameStorageOptions = {}): GameStorage
 
   return {
     async listGames() {
-      return [];
+      let filenames: string[];
+
+      try {
+        filenames = await readdir(gamesDir);
+      } catch (error) {
+        if (isNodeError(error) && error.code === "ENOENT") {
+          return [];
+        }
+
+        throw error;
+      }
+
+      const games = await Promise.all(
+        filenames
+          .filter((filename) => filename.endsWith(".json"))
+          .sort()
+          .map(async (filename) => {
+            const json = await readFile(path.join(gamesDir, filename), "utf8");
+            return validateGame(JSON.parse(json));
+          }),
+      );
+
+      return games;
     },
 
     async loadGame(id) {
@@ -57,12 +140,7 @@ export function createGameStorage(options: GameStorageOptions = {}): GameStorage
         const json = await readFile(gameFilePath(gamesDir, id), "utf8");
         return validateGame(JSON.parse(json));
       } catch (error) {
-        if (
-          error &&
-          typeof error === "object" &&
-          "code" in error &&
-          error.code === "ENOENT"
-        ) {
+        if (isNodeError(error) && error.code === "ENOENT") {
           return null;
         }
 
