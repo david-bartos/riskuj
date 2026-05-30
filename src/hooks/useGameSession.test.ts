@@ -56,7 +56,7 @@ describe("useGameSession", () => {
       currentQuestionId: undefined,
       teamScores: {},
       activeTeamId: undefined,
-      isFinalized: false
+      isFinished: false
     });
     expect(result.current.currentQuestionId).toBeUndefined();
     expect(result.current.revealedQuestionIds).toEqual([]);
@@ -70,7 +70,7 @@ describe("useGameSession", () => {
       currentQuestionId: "q200",
       teamScores: { red: 300 },
       activeTeamId: "red",
-      isFinalized: false
+      isFinished: false
     };
     window.localStorage.setItem(storageKey("demo"), JSON.stringify(storedState));
 
@@ -90,7 +90,7 @@ describe("useGameSession", () => {
         currentQuestionId: "other-current",
         teamScores: { blue: 500 },
         activeTeamId: "blue",
-        isFinalized: true
+        isFinished: true
       } satisfies GameSessionState)
     );
 
@@ -198,7 +198,7 @@ describe("useGameSession", () => {
       currentQuestionId: undefined,
       teamScores: {},
       activeTeamId: undefined,
-      isFinalized: false
+      isFinished: false
     });
     expect(readStoredSession("demo")).toEqual(result.current.state);
   });
@@ -222,7 +222,7 @@ describe("useGameSession", () => {
       currentQuestionId: undefined,
       teamScores: {},
       activeTeamId: undefined,
-      isFinalized: false
+      isFinished: false
     });
     expect(readStoredSession("demo")).toEqual(result.current.state);
   });

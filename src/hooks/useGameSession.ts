@@ -24,7 +24,7 @@ function createDefaultSessionState(gameId: string): GameSessionState {
     currentQuestionId: undefined,
     teamScores: {},
     activeTeamId: undefined,
-    isFinalized: false
+    isFinished: false
   };
 }
 
@@ -59,10 +59,10 @@ function normalizeSessionState(
       typeof storedValue.activeTeamId === "string"
         ? storedValue.activeTeamId
         : defaultState.activeTeamId,
-    isFinalized:
-      typeof storedValue.isFinalized === "boolean"
-        ? storedValue.isFinalized
-        : defaultState.isFinalized
+    isFinished:
+      typeof storedValue.isFinished === "boolean"
+        ? storedValue.isFinished
+        : defaultState.isFinished
   };
 }
 
