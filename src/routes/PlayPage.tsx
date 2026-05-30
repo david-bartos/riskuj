@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { gamesClient } from "../api/gamesClient";
 import { playSfx, type SfxName } from "../audio/sfx";
+import CommonDenominatorRoundScreen from "../components/game/CommonDenominatorRoundScreen";
+import ListeningRoundScreen from "../components/game/ListeningRoundScreen";
 import TeamScoreboard from "../components/game/TeamScoreboard";
 import { useFullscreen } from "../hooks/useFullscreen";
 import { usePresenterFlow } from "../hooks/usePresenterFlow";
@@ -280,41 +282,16 @@ function PresenterView({ game }: { game: Game }) {
 
           {activeContent.type === "listening" &&
           flow.session.presenterStep !== "item-selected" ? (
-            <>
-              <h2>Poslechové kolo</h2>
-              <p>{activeContent.item.prompt}</p>
-              {activeContent.item.audio ? <AudioPlayer src={activeContent.item.audio.src} /> : null}
-              {flow.answerVisible ? (
-                <div className="answer-panel">
-                  <h3>Odpověď</h3>
-                  <p>Interpret: {activeContent.item.artistAnswer ?? activeContent.item.artist}</p>
-                  <p>Název: {activeContent.item.trackTitleAnswer ?? activeContent.item.trackTitle}</p>
-                </div>
-              ) : null}
-            </>
+            <ListeningRoundScreen item={activeContent.item} answerVisible={flow.answerVisible} />
           ) : null}
 
           {activeContent.type === "common-denominator" &&
           flow.session.presenterStep !== "item-selected" ? (
-            <>
-              <h2>{activeContent.item.title}</h2>
-              <ol className="clue-list">
-                {activeContent.item.clues.map((clue, index) => (
-                  <li key={clue.id}>
-                    <strong>Nápověda {index + 1}</strong>
-                    <span>{clue.text ?? clue.prompt}</span>
-                    {clue.audio ? <AudioPlayer src={clue.audio.src} /> : null}
-                  </li>
-                ))}
-              </ol>
-              {flow.answerVisible ? (
-                <div className="answer-panel">
-                  <h3>Finální odpověď</h3>
-                  <p>{activeContent.item.answer}</p>
-                  {activeContent.item.hint ? <p>{activeContent.item.hint}</p> : null}
-                </div>
-              ) : null}
-            </>
+            <CommonDenominatorRoundScreen
+              item={activeContent.item}
+              visibleClueIds={flow.session.revealedClueIds}
+              answerVisible={flow.answerVisible}
+            />
           ) : null}
 
           {flow.answerVisible && activeContent.type === "question" ? (

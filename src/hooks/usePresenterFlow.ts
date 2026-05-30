@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import type { Game, MoneyValue, Round, RoundType } from "../types/game";
+import type { CommonDenominatorItem, Game, MoneyValue, Round, RoundType } from "../types/game";
 import type { GameSession } from "../types/session";
 
 function createSession(game: Game): GameSession {
@@ -33,6 +33,31 @@ function itemValue(game: Game, roundId: string, itemId: string): number {
   }
 
   return 0;
+}
+
+function commonDenominatorItem(
+  game: Game,
+  roundId: string,
+  itemId: string
+): CommonDenominatorItem | undefined {
+  const round = findRound(game, roundId);
+
+  if (round?.type !== "common-denominator") {
+    return undefined;
+  }
+
+  const items =
+    round.items ?? [
+      {
+        id: round.id,
+        title: round.title,
+        clues: round.clues,
+        answer: round.answer,
+        value: (round.points ?? 0) as CommonDenominatorItem["value"]
+      }
+    ];
+
+  return items.find((candidate) => candidate.id === itemId);
 }
 
 export function usePresenterFlow(game: Game) {
@@ -84,6 +109,7 @@ export function usePresenterFlow(game: Game) {
       activeRoundId: roundId,
       activeItem: { roundId, roundType, itemId },
       presenterStep: "item-selected",
+      revealedClueIds: [],
       listeningScoringDraft: {}
     }));
   }, []);
@@ -95,10 +121,42 @@ export function usePresenterFlow(game: Game) {
       }
 
       if (current.presenterStep === "item-selected") {
+        if (current.activeItem.roundType === "common-denominator") {
+          const item = commonDenominatorItem(
+            game,
+            current.activeItem.roundId,
+            current.activeItem.itemId
+          );
+          const firstClueId = item?.clues[0]?.id;
+
+          return {
+            ...current,
+            presenterStep: item?.clues.length ? "prompt-visible" : "answer-visible",
+            revealedClueIds: firstClueId ? [firstClueId] : current.revealedClueIds
+          };
+        }
+
         return { ...current, presenterStep: "prompt-visible" };
       }
 
       if (current.presenterStep === "prompt-visible") {
+        if (current.activeItem.roundType === "common-denominator") {
+          const item = commonDenominatorItem(
+            game,
+            current.activeItem.roundId,
+            current.activeItem.itemId
+          );
+          const visibleClueIds = new Set(current.revealedClueIds);
+          const nextClue = item?.clues.find((clue) => !visibleClueIds.has(clue.id));
+
+          if (nextClue) {
+            return {
+              ...current,
+              revealedClueIds: [...current.revealedClueIds, nextClue.id]
+            };
+          }
+        }
+
         return { ...current, presenterStep: "answer-visible" };
       }
 
@@ -108,7 +166,7 @@ export function usePresenterFlow(game: Game) {
 
       return current;
     });
-  }, []);
+  }, [game]);
 
   const markQuestionCorrect = useCallback(() => {
     setSession((current) => {
