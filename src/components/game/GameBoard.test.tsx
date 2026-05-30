@@ -25,13 +25,13 @@ describe("GameBoard", () => {
       <GameBoard
         game={demoGame}
         currentQuestionId={null}
-        revealedQuestionIds={["q-blue-effect"]}
+        revealedQuestionIds={["riskuj-66-q-02"]}
         onSelectQuestion={vi.fn()}
       />
     );
 
     const usedTile = screen.getByRole("button", {
-      name: "Použito: České hity za 3000 bodů"
+      name: "Použito: Hudební otázky 1 za 3000 bodů"
     });
 
     expect(usedTile).toBeInTheDocument();
@@ -53,19 +53,19 @@ describe("GameBoard", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Film, otázka za 5000 bodů"
+        name: "Hudební otázky 3, otázka za 5000 bodů"
       })
     );
 
     expect(onSelectQuestion).toHaveBeenCalledTimes(1);
-    expect(onSelectQuestion).toHaveBeenCalledWith("q-star-wars");
+    expect(onSelectQuestion).toHaveBeenCalledWith("riskuj-66-q-11");
   });
 
   it("renders sparse boards with visible disabled cells", () => {
     const sparseGame: Game = {
       ...demoGame,
       questions: demoGame.questions.filter(
-        (question) => question.id !== "q-nevermind"
+        (question) => question.id !== "riskuj-66-q-24"
       )
     };
 
@@ -79,13 +79,13 @@ describe("GameBoard", () => {
     );
 
     const board = screen.getByRole("grid", {
-      name: "Herní tabule Hudební RISKuj!"
+      name: "Herní tabule Riskuj 6.6"
     });
 
-    expect(within(board).getAllByRole("button")).toHaveLength(12);
+    expect(within(board).getAllByRole("button")).toHaveLength(24);
     expect(
       screen.getByRole("button", {
-        name: "Rock za 1000 bodů není dostupné"
+        name: "Hudební otázky 6 za 10000 bodů není dostupné"
       })
     ).toBeDisabled();
   });
