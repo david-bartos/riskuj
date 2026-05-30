@@ -82,11 +82,6 @@ function AudioPlayer({ src }: { src: string }) {
   return <audio aria-label="Přehrát audio ukázku" controls src={src} />;
 }
 
-function eventDateLabel(title: string) {
-  const match = title.match(/(\d{1,2})\.(\d{1,2})/);
-  return match ? `${match[1]}.${match[2]}.` : "";
-}
-
 function PresenterView({ game, onExit }: { game: Game; onExit?: () => void }) {
   const presenterRef = useRef<HTMLElement>(null);
   const { isFullscreen, isSupported, toggleFullscreen } = useFullscreen(presenterRef);
@@ -94,7 +89,6 @@ function PresenterView({ game, onExit }: { game: Game; onExit?: () => void }) {
   const [isSoundEnabled] = useState(true);
   const [activeRoundIndex, setActiveRoundIndex] = useState(0);
   const activeRound = game.rounds[activeRoundIndex] ?? game.rounds[0];
-  const dateLabel = eventDateLabel(game.title);
 
   const activeContent = useMemo(
     () =>
@@ -185,40 +179,30 @@ function PresenterView({ game, onExit }: { game: Game; onExit?: () => void }) {
       ref={presenterRef}
     >
       <header className="presenter-header presenter-header-compact">
-        <button
-          type="button"
-          className="presenter-exit-button"
-          aria-label="Zpět ze hry"
-          onClick={onExit ?? (() => window.history.back())}
-        >
-          ◀
-        </button>
-        <h1 id="play-title">Riskuj!</h1>
+        <div className="presenter-title-row">
+          <h1 id="play-title">Riskuj!</h1>
+          <nav className="round-tabs" role="tablist" aria-label="Kola soutěže">
+            {game.rounds.map((round, index) => (
+              <button
+                type="button"
+                role="tab"
+                key={round.id}
+                aria-selected={index === activeRoundIndex}
+                className="round-tab-button"
+                onClick={() => setActiveRoundIndex(index)}
+              >
+                {index + 1}
+              </button>
+            ))}
+          </nav>
+        </div>
         <TeamScoreboard
           teams={game.teams}
           scores={flow.session.teamScores}
           activeTeamId={flow.session.activeTeamId}
           onSelectTeam={flow.selectTeam}
         />
-        <div className="presenter-date" aria-label="Datum hry">
-          {dateLabel}
-        </div>
       </header>
-
-      <nav className="round-tabs" role="tablist" aria-label="Kola soutěže">
-        {game.rounds.map((round, index) => (
-          <button
-            type="button"
-            role="tab"
-            key={round.id}
-            aria-selected={index === activeRoundIndex}
-            className="round-tab-button"
-            onClick={() => setActiveRoundIndex(index)}
-          >
-            {index + 1}
-          </button>
-        ))}
-      </nav>
 
       <div className="presenter-board" data-active-round={activeRound?.id}>
         {activeRound?.type === "question" ? (

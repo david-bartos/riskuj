@@ -1510,3 +1510,47 @@ h4 {
     grid-column: 1 / -1;
   }
 }
+
+
+/* Simplified presenter header: title + round tabs, then teams only. */
+.presenter-header-compact {
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  gap: clamp(0.25rem, 0.7vw, 0.5rem);
+  margin-bottom: clamp(0.35rem, 0.9vw, 0.65rem);
+}
+
+.presenter-title-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.45rem, 1vw, 0.8rem);
+  min-width: 0;
+}
+
+.presenter-title-row h1 {
+  flex: 0 0 auto;
+}
+
+.presenter-title-row .round-tabs {
+  justify-content: flex-start;
+  margin: 0;
+}
+
+.presenter-date,
+.presenter-exit-button {
+  display: none;
+}
+
+.presenter-header-compact .team-scoreboard {
+  width: 100%;
+}
+
+@media (max-width: 680px) {
+  .presenter-header-compact {
+    grid-template-columns: 1fr;
+  }
+
+  .presenter-header-compact .team-scoreboard {
+    grid-column: auto;
+  }
+}

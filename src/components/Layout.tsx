@@ -21,7 +21,7 @@ export function Layout({ children, currentPath, onNavigate }: LayoutProps) {
           type="button"
           onClick={() => onNavigate("/")}
         >
-          Hudební RISKuj!
+          Riskuj!
         </button>
         <nav className="app-nav" aria-label="Hlavní navigace">
           {navItems.map((item) => (

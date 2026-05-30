@@ -46,6 +46,8 @@ describe("App", () => {
     render(<App />);
 
     expect(screen.getByRole("heading", { name: "Hudební RISKuj!" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Riskuj!" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Hudební RISKuj!" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Editor hry" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Spustit hru" })).toBeInTheDocument();
   });

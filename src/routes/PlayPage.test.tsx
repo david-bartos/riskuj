@@ -29,19 +29,27 @@ describe("PlayPage", () => {
   });
 
 
-  it("v presenteru ukazuje kompaktní horní lištu, datum, zpět a přepínače kol", async () => {
-    const onExit = vi.fn();
-    render(<PlayPage gameId="riskuj-2026-06-06" onExit={onExit} />);
+  it("v presenteru ukazuje jen titul Riskuj a přepínače kol v jednom horním řádku", async () => {
+    render(<PlayPage gameId="riskuj-2026-06-06" />);
 
-    await screen.findByRole("heading", { name: "Riskuj!" });
-    expect(screen.getByText("6.6.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Zpět ze hry" }));
-    expect(onExit).toHaveBeenCalledTimes(1);
+    const heading = await screen.findByRole("heading", { name: "Riskuj!" });
+    const header = heading.closest("header");
+    expect(header).not.toBeNull();
+    expect(within(header as HTMLElement).queryByText("6.6.")).not.toBeInTheDocument();
+    expect(within(header as HTMLElement).queryByRole("button", { name: "Zpět ze hry" })).not.toBeInTheDocument();
 
-    const roundTabs = screen.getByRole("tablist", { name: "Kola soutěže" });
+    const roundTabs = within(header as HTMLElement).getByRole("tablist", { name: "Kola soutěže" });
     expect(within(roundTabs).getByRole("tab", { name: "1" })).toHaveAttribute("aria-selected", "true");
     expect(within(roundTabs).getByRole("tab", { name: "2" })).toHaveAttribute("aria-selected", "false");
     expect(within(roundTabs).getByRole("tab", { name: "3" })).toHaveAttribute("aria-selected", "false");
+  });
+
+  it("neopakuje přepínače kol pod headerem, pod titulkem zůstává jen skóre týmů", async () => {
+    render(<PlayPage gameId="riskuj-2026-06-06" />);
+
+    await screen.findByRole("heading", { name: "Riskuj!" });
+    expect(screen.getAllByRole("tablist", { name: "Kola soutěže" })).toHaveLength(1);
+    expect(screen.getByRole("region", { name: "Skóre týmů" })).toBeInTheDocument();
   });
 
   it("zobrazuje vždy jen jedno soutěžní kolo a přepíná ho tlačítky 1 2 3", async () => {
