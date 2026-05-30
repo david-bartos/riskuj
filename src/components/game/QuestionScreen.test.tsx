@@ -49,6 +49,32 @@ describe("QuestionScreen", () => {
     expect(screen.queryByText("Ivan Mládek")).not.toBeInTheDocument();
   });
 
+  it("před odkrytím nezobrazí název audio assetu ani poznámku moderátora", () => {
+    render(
+      <QuestionScreen
+        category={category}
+        question={{
+          ...question,
+          moderatorNote: "Uznat i kapelu Banjo Band.",
+          audio: {
+            ...question.audio!,
+            title: "Ivan Mládek - Jožin z bažin"
+          }
+        }}
+        onComplete={vi.fn()}
+        onBackToBoard={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole("region", { name: "Hudební ukázka" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Přehrát audio ukázku")).toHaveAttribute(
+      "src",
+      "/uploads/demo-placeholder.mp3"
+    );
+    expect(screen.queryByText("Ivan Mládek - Jožin z bažin")).not.toBeInTheDocument();
+    expect(screen.queryByText("Uznat i kapelu Banjo Band.")).not.toBeInTheDocument();
+  });
+
   it("po kliknutí na Zobrazit odpověď odpověď vykreslí", () => {
     renderQuestionScreen();
 
@@ -89,11 +115,15 @@ describe("QuestionScreen", () => {
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it("zobrazí volitelnou audio oblast", () => {
+  it("zobrazí volitelnou audio oblast bez názvu assetu", () => {
     renderQuestionScreen();
 
     expect(screen.getByRole("region", { name: "Hudební ukázka" })).toBeInTheDocument();
-    expect(screen.getByText("Ukázka českého hitu")).toBeInTheDocument();
+    expect(screen.getByLabelText("Přehrát audio ukázku")).toHaveAttribute(
+      "src",
+      "/uploads/demo-placeholder.mp3"
+    );
+    expect(screen.queryByText("Ukázka českého hitu")).not.toBeInTheDocument();
   });
 
   it("tlačítko Zpět na tabuli zavolá callback", () => {
