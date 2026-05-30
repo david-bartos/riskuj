@@ -106,7 +106,17 @@ describe("PlayPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /Společný jmenovatel 1/i }));
     fireEvent.keyDown(window, { key: "Enter" });
 
+    expect(await screen.findByText("Doplnit indicii 1 pro společný jmenovatel 1.")).toBeInTheDocument();
+    expect(screen.queryByText("Doplnit indicii 2 pro společný jmenovatel 1.")).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("Doplnit odpověď 1");
+
+    fireEvent.keyDown(window, { key: "Enter" });
     expect(await screen.findByText("Doplnit indicii 2 pro společný jmenovatel 1.")).toBeInTheDocument();
+    expect(screen.queryByText("Doplnit indicii 3 pro společný jmenovatel 1.")).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("Doplnit odpověď 1");
+
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(await screen.findByText("Doplnit indicii 3 pro společný jmenovatel 1.")).toBeInTheDocument();
     expect(document.body.textContent).not.toContain("Doplnit odpověď 1");
 
     fireEvent.keyDown(window, { key: "Enter" });
