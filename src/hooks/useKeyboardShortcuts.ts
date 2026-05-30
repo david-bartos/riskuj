@@ -18,7 +18,12 @@ function isEditableTarget(target: EventTarget | null): boolean {
     return true;
   }
 
-  return Boolean(target.closest("[contenteditable=''], [contenteditable='true']"));
+  const contentEditableElement = target.closest("[contenteditable]");
+
+  return (
+    contentEditableElement !== null &&
+    contentEditableElement.getAttribute("contenteditable")?.toLowerCase() !== "false"
+  );
 }
 
 function hasBlockedModifier(event: KeyboardEvent): boolean {

@@ -19,6 +19,13 @@ function TestShortcuts(options: KeyboardShortcutOptions) {
         Editable region
         <span>Nested editable text</span>
       </div>
+      <div
+        contentEditable="plaintext-only"
+        aria-label="plaintext editable region"
+        suppressContentEditableWarning
+      >
+        Plaintext editable region
+      </div>
     </div>
   );
 }
@@ -123,6 +130,9 @@ describe("useKeyboardShortcuts", () => {
     fireEvent.keyDown(screen.getByLabelText("select field"), { key: "a" });
     fireEvent.keyDown(screen.getByLabelText("editable region"), { key: "a" });
     fireEvent.keyDown(screen.getByText("Nested editable text"), { key: "a" });
+    fireEvent.keyDown(screen.getByLabelText("plaintext editable region"), {
+      key: "a"
+    });
 
     expect(onBackToBoard).not.toHaveBeenCalled();
     expect(onToggleAudio).not.toHaveBeenCalled();
