@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { gamesClient } from "../api/gamesClient";
 import type {
   CommonDenominatorRound,
   Game,
   ListeningItem,
+  ListeningRound,
   QuestionItem,
-  QuestionRound,
-  Round
+  QuestionRound
 } from "../types/game";
 
 type Phase = "board" | "prompt" | "answer";
@@ -24,7 +25,7 @@ type SelectedContent =
     }
   | {
       kind: "listening";
-      round: Round;
+      round: ListeningRound;
       item: ListeningItem;
       points: number;
     }
@@ -38,13 +39,29 @@ type PlayPageProps = {
   gameId: string;
 };
 
-const selectedId = (target: SelectedTarget) => {
+function selectedId(target: SelectedTarget) {
   if (target.kind === "common-denominator") {
     return `${target.kind}:${target.roundId}`;
   }
 
   return `${target.kind}:${target.roundId}:${target.itemId}`;
-};
+}
+
+function questionItems(round: QuestionRound) {
+  return round.questions.length > 0 ? round.questions : round.items ?? [];
+}
+
+function listeningItems(round: ListeningRound) {
+  return round.tracks.length > 0 ? round.tracks : round.items ?? [];
+}
+
+function listeningAnswerTitle(item: ListeningItem) {
+  return item.trackTitleAnswer ?? item.title ?? item.answer;
+}
+
+function listeningAnswerArtist(item: ListeningItem) {
+  return item.artistAnswer ?? item.artist ?? "";
+}
 
 function findSelectedContent(
   game: Game | null,
@@ -60,20 +77,17 @@ function findSelectedContent(
   }
 
   if (selected.kind === "question" && round.type === "question") {
-    const item = round.items.find((candidate) => candidate.id === selected.itemId);
+    const item = questionItems(round).find((candidate) => candidate.id === selected.itemId);
     return item ? { kind: "question", round, item, points: item.points } : null;
   }
 
   if (selected.kind === "listening" && round.type === "listening") {
-    const item = round.items.find((candidate) => candidate.id === selected.itemId);
-    return item ? { kind: "listening", round, item, points: item.points } : null;
+    const item = listeningItems(round).find((candidate) => candidate.id === selected.itemId);
+    return item ? { kind: "listening", round, item, points: item.points ?? 0 } : null;
   }
 
-  if (
-    selected.kind === "common-denominator" &&
-    round.type === "common-denominator"
-  ) {
-    return { kind: "common-denominator", round, points: round.points };
+  if (selected.kind === "common-denominator" && round.type === "common-denominator") {
+    return { kind: "common-denominator", round, points: round.points ?? 0 };
   }
 
   return null;
@@ -83,7 +97,7 @@ function AudioPlayer({ src }: { src: string }) {
   return <audio aria-label="Přehrát audio ukázku" controls src={src} />;
 }
 
-export default function PlayPage({ gameId }: PlayPageProps) {
+export function PlayPage({ gameId }: PlayPageProps) {
   const [game, setGame] = useState<Game | null>(null);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<SelectedTarget | null>(null);
@@ -98,20 +112,13 @@ export default function PlayPage({ gameId }: PlayPageProps) {
     async function loadGame() {
       try {
         setError("");
-        const response = await fetch(`/api/games/${encodeURIComponent(gameId)}`);
-        if (!response.ok) {
-          throw new Error("Game request failed");
-        }
-
-        const loadedGame = (await response.json()) as Game;
+        const loadedGame = await gamesClient.loadGame(gameId);
         if (!isMounted) {
           return;
         }
 
         setGame(loadedGame);
-        setScores(
-          Object.fromEntries(loadedGame.teams.map((team) => [team.id, 0]))
-        );
+        setScores(Object.fromEntries(loadedGame.teams.map((team) => [team.id, 0])));
         setActiveTeamId(loadedGame.teams[0]?.id ?? "");
         setSelected(null);
         setPhase("board");
@@ -174,8 +181,7 @@ export default function PlayPage({ gameId }: PlayPageProps) {
 
     setScores((currentScores) => ({
       ...currentScores,
-      [activeTeamId]:
-        (currentScores[activeTeamId] ?? 0) + selectedContent.points * direction
+      [activeTeamId]: (currentScores[activeTeamId] ?? 0) + selectedContent.points * direction
     }));
   }
 
@@ -190,24 +196,25 @@ export default function PlayPage({ gameId }: PlayPageProps) {
 
   if (error) {
     return (
-      <main className="presenter-shell">
-        <p>{error}</p>
-      </main>
+      <section className="page-panel page-panel-wide play-page" aria-labelledby="play-title">
+        <h1 id="play-title">Hra nenalezena</h1>
+        <p className="page-copy">{error}</p>
+      </section>
     );
   }
 
   if (!game) {
     return (
-      <main className="presenter-shell">
-        <p>Načítám hru.</p>
-      </main>
+      <section className="page-panel page-panel-wide play-page" aria-labelledby="play-title">
+        <h1 id="play-title">Načítám hru</h1>
+      </section>
     );
   }
 
   return (
-    <main className="presenter-shell">
+    <section className="presenter-shell" aria-labelledby="play-title">
       <header className="presenter-header">
-        <h1>{game.title}</h1>
+        <h1 id="play-title">{game.title}</h1>
         <section className="scoreboard" aria-label="Skóre týmů" role="region">
           {game.teams.map((team) => (
             <div key={team.id} className="scoreboard-team">
@@ -228,7 +235,7 @@ export default function PlayPage({ gameId }: PlayPageProps) {
                   {round.categories.map((category) => (
                     <div key={category.id} className="question-column">
                       <h3>{category.title}</h3>
-                      {round.items
+                      {questionItems(round)
                         .filter((item) => item.categoryId === category.id)
                         .map((item) => {
                           const target: SelectedTarget = {
@@ -263,7 +270,7 @@ export default function PlayPage({ gameId }: PlayPageProps) {
               <section className="round-section" key={round.id}>
                 <h2>{round.title}</h2>
                 <div className="question-grid">
-                  {round.items.map((item) => {
+                  {listeningItems(round).map((item) => {
                     const target: SelectedTarget = {
                       kind: "listening",
                       roundId: round.id,
@@ -280,7 +287,7 @@ export default function PlayPage({ gameId }: PlayPageProps) {
                         onClick={() => selectTarget(target)}
                         type="button"
                       >
-                        Poslech za {item.points}
+                        Poslech za {item.points ?? 0}
                       </button>
                     );
                   })}
@@ -289,26 +296,20 @@ export default function PlayPage({ gameId }: PlayPageProps) {
             );
           }
 
+          const target: SelectedTarget = { kind: "common-denominator", roundId: round.id };
+          const isCompleted = completedIds.includes(selectedId(target));
+
           return (
             <section className="round-section" key={round.id}>
               <h2>{round.title}</h2>
               <button
-                aria-disabled={completedIds.includes(
-                  selectedId({ kind: "common-denominator", roundId: round.id })
-                )}
+                aria-disabled={isCompleted}
                 className="tile-button"
-                disabled={completedIds.includes(
-                  selectedId({ kind: "common-denominator", roundId: round.id })
-                )}
-                onClick={() =>
-                  selectTarget({
-                    kind: "common-denominator",
-                    roundId: round.id
-                  })
-                }
+                disabled={isCompleted}
+                onClick={() => selectTarget(target)}
                 type="button"
               >
-                Společný jmenovatel za {round.points}
+                Společný jmenovatel za {round.points ?? 0}
               </button>
             </section>
           );
@@ -321,38 +322,40 @@ export default function PlayPage({ gameId }: PlayPageProps) {
             <>
               <h2>Otázka za {selectedContent.item.points}</h2>
               <p>{selectedContent.item.prompt}</p>
-              {selectedContent.item.audio && (
+              {selectedContent.item.audio ? (
                 <AudioPlayer src={selectedContent.item.audio.src} />
-              )}
-              {phase === "answer" && (
+              ) : null}
+              {phase === "answer" ? (
                 <div className="answer-panel">
                   <h3>Odpověď</h3>
                   <p>{selectedContent.item.answer}</p>
-                  {selectedContent.item.moderatorNote && (
+                  {selectedContent.item.moderatorNote ? (
                     <p>{selectedContent.item.moderatorNote}</p>
-                  )}
+                  ) : null}
                 </div>
-              )}
+              ) : null}
             </>
           )}
 
           {selectedContent.kind === "listening" && (
             <>
-              <h2>Poslech za {selectedContent.item.points}</h2>
+              <h2>Poslech za {selectedContent.item.points ?? 0}</h2>
               <p>{selectedContent.item.prompt}</p>
-              {selectedContent.item.audio && (
+              {selectedContent.item.audio ? (
                 <AudioPlayer src={selectedContent.item.audio.src} />
-              )}
-              {phase === "answer" && (
+              ) : null}
+              {phase === "answer" ? (
                 <div className="answer-panel">
                   <h3>Odpověď</h3>
-                  <p>Název: {selectedContent.item.trackTitleAnswer}</p>
-                  <p>Interpret: {selectedContent.item.artistAnswer}</p>
-                  {selectedContent.item.moderatorNote && (
+                  <p>Název: {listeningAnswerTitle(selectedContent.item)}</p>
+                  {listeningAnswerArtist(selectedContent.item) ? (
+                    <p>Interpret: {listeningAnswerArtist(selectedContent.item)}</p>
+                  ) : null}
+                  {selectedContent.item.moderatorNote ? (
                     <p>{selectedContent.item.moderatorNote}</p>
-                  )}
+                  ) : null}
                 </div>
-              )}
+              ) : null}
             </>
           )}
 
@@ -363,24 +366,24 @@ export default function PlayPage({ gameId }: PlayPageProps) {
                 {selectedContent.round.clues.map((clue, index) => (
                   <li key={clue.id}>
                     <strong>Nápověda {index + 1}</strong>
-                    <span>{clue.prompt}</span>
-                    {clue.audio && <AudioPlayer src={clue.audio.src} />}
+                    <span>{clue.prompt ?? clue.text}</span>
+                    {clue.audio ? <AudioPlayer src={clue.audio.src} /> : null}
                   </li>
                 ))}
               </ol>
-              {phase === "answer" && (
+              {phase === "answer" ? (
                 <div className="answer-panel">
                   <h3>Finální odpověď</h3>
                   <p>{selectedContent.round.answer}</p>
-                  {selectedContent.round.moderatorNote && (
+                  {selectedContent.round.moderatorNote ? (
                     <p>{selectedContent.round.moderatorNote}</p>
-                  )}
+                  ) : null}
                 </div>
-              )}
+              ) : null}
             </>
           )}
 
-          {phase === "answer" && (
+          {phase === "answer" ? (
             <div className="scoring-controls">
               <label>
                 <span>Bodovaný tým</span>
@@ -405,9 +408,11 @@ export default function PlayPage({ gameId }: PlayPageProps) {
                 Zpět na tabuli
               </button>
             </div>
-          )}
+          ) : null}
         </section>
       )}
-    </main>
+    </section>
   );
 }
+
+export default PlayPage;

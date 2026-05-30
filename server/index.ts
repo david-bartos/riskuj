@@ -1,93 +1,146 @@
 import express from "express";
 import multer from "multer";
-import crypto from "node:crypto";
-import { existsSync, mkdirSync } from "node:fs";
-import { readdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { randomUUID } from "node:crypto";
+import { mkdirSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
+import { basename, extname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { demoGame } from "../src/data/demoGame";
 import type { AudioAsset, Game } from "../src/types/game";
+import { assertValidGame, createEmptyGame, GameValidationError } from "./gameValidation";
+import { GamesRepository, isSafeGameId } from "./gamesRepository";
 
-type ServerOptions = {
-  dataDir?: string;
+type CreateServerOptions = {
+  gamesDirectory?: string;
+  uploadsDir?: string;
+  audioAssetsPath?: string;
 };
 
-const gameIdPattern = /^[A-Za-z0-9_-]+$/;
-
-function isSafeGameId(id: string) {
-  return gameIdPattern.test(id);
+interface AudioUploadRequest extends express.Request {
+  generatedAudioId?: string;
 }
 
-async function readJsonFile<T>(filePath: string, fallback: T): Promise<T> {
-  try {
-    const content = await readFile(filePath, "utf8");
-    return JSON.parse(content) as T;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return fallback;
-    }
+const defaultUploadsDir = resolve(process.cwd(), "data", "uploads");
+const defaultAudioAssetsPath = resolve(process.cwd(), "data", "audio-assets.json");
+const mp3UploadRequiredMessage = 'MP3 file is required in multipart field "file".';
+const invalidMp3Message = "Only MP3 audio uploads are supported.";
 
-    throw error;
-  }
+const asyncHandler =
+  (handler: express.RequestHandler): express.RequestHandler =>
+  (request, response, next) => {
+    Promise.resolve(handler(request, response, next)).catch(next);
+  };
+
+function createAudioId() {
+  return randomUUID();
 }
 
-async function writeJsonFile(filePath: string, value: unknown) {
-  await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
-}
-
-function isGame(value: unknown): value is Game {
-  const game = value as Partial<Game>;
+function isAcceptedMp3(file: Express.Multer.File) {
   return (
-    typeof game?.id === "string" &&
-    typeof game.title === "string" &&
-    Array.isArray(game.teams) &&
-    Array.isArray(game.rounds)
+    file.mimetype === "audio/mpeg" ||
+    file.mimetype === "audio/mp3" ||
+    file.originalname.toLowerCase().endsWith(".mp3")
   );
 }
 
-export function createServer(options: ServerOptions = {}) {
-  const app = express();
-  const dataDir = options.dataDir ?? path.join(process.cwd(), "server", "data");
-  const gamesDir = path.join(dataDir, "games");
-  const uploadsDir = path.join(dataDir, "uploads");
-  const audioManifestPath = path.join(dataDir, "audio-assets.json");
+function titleFromUpload(file: Express.Multer.File, formTitle: unknown) {
+  const title = typeof formTitle === "string" ? formTitle.trim() : "";
 
-  mkdirSync(gamesDir, { recursive: true });
+  if (title) {
+    return title;
+  }
+
+  const filename = basename(file.originalname);
+  const extension = extname(filename);
+
+  return extension.toLowerCase() === ".mp3"
+    ? filename.slice(0, -extension.length)
+    : filename;
+}
+
+export function createServer(options: CreateServerOptions = {}) {
+  const app = express();
+  const gamesRepository = new GamesRepository(options.gamesDirectory);
+  const uploadsDir = options.uploadsDir ?? defaultUploadsDir;
+  const audioAssetsPath = options.audioAssetsPath ?? defaultAudioAssetsPath;
+
   mkdirSync(uploadsDir, { recursive: true });
 
-  const readAudioAssets = () =>
-    readJsonFile<AudioAsset[]>(audioManifestPath, []);
-  const writeAudioAssets = (assets: AudioAsset[]) =>
-    writeJsonFile(audioManifestPath, assets);
-
-  const storage = multer.diskStorage({
-    destination: (_request, _file, callback) => {
-      callback(null, uploadsDir);
-    },
-    filename: (_request, _file, callback) => {
-      callback(null, `${crypto.randomUUID()}.mp3`);
+  async function readAudioAssets(): Promise<AudioAsset[]> {
+    try {
+      return JSON.parse(await readFile(audioAssetsPath, "utf8")) as AudioAsset[];
+    } catch (error) {
+      if (isNodeError(error) && error.code === "ENOENT") {
+        return [];
+      }
+      throw error;
     }
-  });
+  }
+
+  async function appendAudioAsset(asset: AudioAsset) {
+    const assets = await readAudioAssets();
+    await writeFile(audioAssetsPath, `${JSON.stringify([...assets, asset], null, 2)}\n`, "utf8");
+  }
 
   const upload = multer({
-    storage,
-    limits: {
-      fileSize: 25 * 1024 * 1024
-    },
     fileFilter: (_request, file, callback) => {
-      const isMp3 =
-        file.mimetype === "audio/mpeg" ||
-        file.mimetype === "audio/mp3" ||
-        file.originalname.toLowerCase().endsWith(".mp3");
-
-      if (!isMp3) {
-        callback(new multer.MulterError("LIMIT_UNEXPECTED_FILE", "file"));
+      if (isAcceptedMp3(file)) {
+        callback(null, true);
         return;
       }
 
-      callback(null, true);
-    }
+      callback(new Error(invalidMp3Message));
+    },
+    storage: multer.diskStorage({
+      destination: (_request, _file, callback) => {
+        callback(null, uploadsDir);
+      },
+      filename: (request: AudioUploadRequest, _file, callback) => {
+        const audioId = createAudioId();
+        request.generatedAudioId = audioId;
+        callback(null, `${audioId}.mp3`);
+      }
+    })
   });
+
+  function handleAudioUpload(statusCode: 200 | 201): express.RequestHandler {
+    return (request: AudioUploadRequest, response) => {
+      upload.single("file")(request, response, (error: unknown) => {
+        if (error) {
+          response.status(400).json({
+            error:
+              error instanceof Error && error.message === invalidMp3Message
+                ? invalidMp3Message
+                : mp3UploadRequiredMessage
+          });
+          return;
+        }
+
+        if (!request.file || !request.generatedAudioId) {
+          response.status(400).json({ error: mp3UploadRequiredMessage });
+          return;
+        }
+
+        const title = titleFromUpload(request.file, request.body.title ?? request.body.displayName);
+        const asset: AudioAsset = {
+          id: request.generatedAudioId,
+          src: `/uploads/${request.generatedAudioId}.mp3`,
+          title,
+          originalName: request.file.originalname,
+          displayName: title,
+          mimeType: "audio/mpeg"
+        };
+
+        void appendAudioAsset(asset)
+          .then(() => {
+            response.status(statusCode).json(asset);
+          })
+          .catch((appendError: unknown) => {
+            response.locals.uploadAppendError = appendError;
+            response.status(500).json({ message: "Nastala chyba serveru." });
+          });
+      });
+    };
+  }
 
   app.use(express.json());
   app.use("/uploads", express.static(uploadsDir));
@@ -96,131 +149,137 @@ export function createServer(options: ServerOptions = {}) {
     response.json({ status: "ok" });
   });
 
-  app.get("/api/games", async (_request, response, next) => {
-    try {
-      const fileNames = existsSync(gamesDir) ? await readdir(gamesDir) : [];
-      const games = await Promise.all(
-        fileNames
-          .filter((fileName) => fileName.endsWith(".json"))
-          .map((fileName) =>
-            readJsonFile<Game | null>(path.join(gamesDir, fileName), null)
-          )
-      );
+  app.get(
+    "/api/games",
+    asyncHandler(async (_request, response) => {
+      response.json(await gamesRepository.list());
+    })
+  );
 
-      response.json(games.filter((game): game is Game => Boolean(game)));
-    } catch (error) {
-      next(error);
-    }
-  });
+  app.get(
+    "/api/games/:id",
+    asyncHandler(async (request, response) => {
+      const id = readRouteId(request.params.id);
 
-  app.get("/api/games/:gameId", async (request, response, next) => {
-    try {
-      const { gameId } = request.params;
-      if (!isSafeGameId(gameId)) {
-        response.status(400).json({ error: "Invalid game id" });
+      if (!isSafeGameId(id)) {
+        response.status(400).json({ message: "Neplatné ID hry." });
         return;
       }
 
-      const gamePath = path.join(gamesDir, `${gameId}.json`);
-      const storedGame = await readJsonFile<Game | null>(gamePath, null);
-      if (storedGame) {
-        response.json(storedGame);
+      const game = await gamesRepository.load(id);
+
+      if (!game) {
+        response.status(404).json({ message: "Hra nebyla nalezena." });
         return;
       }
 
-      if (gameId === demoGame.id || gameId === "demo") {
-        response.json(demoGame);
-        return;
-      }
-
-      response.status(404).json({ error: "Game not found" });
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.put("/api/games/:gameId", async (request, response, next) => {
-    try {
-      const { gameId } = request.params;
-      if (!isSafeGameId(gameId)) {
-        response.status(400).json({ error: "Invalid game id" });
-        return;
-      }
-
-      if (!isGame(request.body)) {
-        response.status(400).json({ error: "Invalid game payload" });
-        return;
-      }
-
-      if (request.body.id !== gameId) {
-        response.status(400).json({ error: "Game id mismatch" });
-        return;
-      }
-
-      const gamePath = path.join(gamesDir, `${gameId}.json`);
-      await writeJsonFile(gamePath, request.body);
-      response.json(request.body);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.get("/api/audio-assets", async (_request, response, next) => {
-    try {
-      response.json(await readAudioAssets());
-    } catch (error) {
-      next(error);
-    }
-  });
+      response.json(game);
+    })
+  );
 
   app.post(
-    "/api/audio-assets",
-    upload.single("file"),
-    async (request, response, next) => {
-      try {
-        if (!request.file) {
-          response.status(400).json({ error: "Missing MP3 file" });
-          return;
-        }
+    "/api/games",
+    asyncHandler(async (request, response) => {
+      const game = isFullGamePayload(request.body)
+        ? request.body
+        : createEmptyGame(readOptionalTitle(request.body));
 
-        const asset: AudioAsset = {
-          id: crypto.randomUUID(),
-          src: `/uploads/${request.file.filename}`,
-          originalName: request.file.originalname,
-          displayName:
-            typeof request.body.displayName === "string" &&
-            request.body.displayName.trim()
-              ? request.body.displayName.trim()
-              : request.file.originalname,
-          mimeType: "audio/mpeg"
-        };
+      assertValidGame(game);
+      assertSafeGameId(game.id);
+      const savedGame = await gamesRepository.save(game);
 
-        const assets = await readAudioAssets();
-        await writeAudioAssets([...assets, asset]);
-        response.status(201).json(asset);
-      } catch (error) {
-        next(error);
-      }
-    }
+      response.status(201).json(savedGame);
+    })
   );
+
+  app.put(
+    "/api/games/:id",
+    asyncHandler(async (request, response) => {
+      const id = readRouteId(request.params.id);
+
+      if (!isSafeGameId(id)) {
+        response.status(400).json({ message: "Neplatné ID hry." });
+        return;
+      }
+
+      if (!isRecord(request.body) || request.body.id !== id) {
+        throw new GameValidationError(["ID hry v adrese neodpovídá tělu požadavku."]);
+      }
+
+      const game = {
+        ...request.body,
+        updatedAt: new Date().toISOString()
+      };
+
+      assertValidGame(game);
+      const savedGame = await gamesRepository.save(game);
+
+      response.json(savedGame);
+    })
+  );
+
+  app.get(
+    "/api/audio-assets",
+    asyncHandler(async (_request, response) => {
+      response.json(await readAudioAssets());
+    })
+  );
+  app.post("/api/audio-assets", handleAudioUpload(201));
+  app.post("/api/uploads/audio", handleAudioUpload(200));
 
   app.use(
     (
       error: unknown,
       _request: express.Request,
       response: express.Response,
-      next: express.NextFunction
+      _next: express.NextFunction
     ) => {
-      if (error instanceof multer.MulterError) {
-        response.status(400).json({ error: "Only MP3 uploads are supported" });
+      if (error instanceof GameValidationError) {
+        response.status(400).json({
+          message: "Hru se nepodařilo uložit.",
+          details: error.details
+        });
         return;
       }
 
-      next(error);
+      console.error(error);
+      response.status(500).json({ message: "Nastala chyba serveru." });
     }
   );
 
   return app;
+}
+
+function isFullGamePayload(value: unknown): value is Game {
+  return isRecord(value) && "id" in value && "teams" in value && "rounds" in value;
+}
+
+function readOptionalTitle(value: unknown) {
+  if (!isRecord(value) || typeof value.title !== "string") {
+    return undefined;
+  }
+
+  return value.title;
+}
+
+function readRouteId(value: string | string[] | undefined) {
+  return typeof value === "string" ? value : "";
+}
+
+function assertSafeGameId(id: string) {
+  if (!isSafeGameId(id)) {
+    throw new GameValidationError([
+      "ID hry smí obsahovat jen písmena, číslice, pomlčku a podtržítko."
+    ]);
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
 }
 
 const isDirectRun = process.argv[1]

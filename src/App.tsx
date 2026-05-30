@@ -1,31 +1,57 @@
-import AdminPage from "./routes/AdminPage";
-import PlayPage from "./routes/PlayPage";
+import { useEffect, useState } from "react";
+import { Layout } from "./components/Layout";
+import { AdminPage } from "./routes/AdminPage";
+import { HomePage } from "./routes/HomePage";
+import { PlayPage } from "./routes/PlayPage";
 
-export default function App() {
-  const playMatch = window.location.pathname.match(/^\/play\/([^/]+)$/);
+type Route =
+  | { name: "home" }
+  | { name: "admin" }
+  | { name: "play"; gameId: string };
 
-  if (window.location.pathname === "/admin") {
-    return <AdminPage />;
+function parseRoute(pathname: string): Route {
+  if (pathname === "/admin") {
+    return { name: "admin" };
   }
 
+  const playMatch = pathname.match(/^\/play\/([^/]+)$/);
   if (playMatch) {
-    return <PlayPage gameId={decodeURIComponent(playMatch[1])} />;
+    return { name: "play", gameId: decodeURIComponent(playMatch[1]) };
+  }
+
+  return { name: "home" };
+}
+
+export default function App() {
+  const [path, setPath] = useState(() => window.location.pathname);
+  const route = parseRoute(path);
+
+  useEffect(() => {
+    const handlePopState = () => setPath(window.location.pathname);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const navigate = (nextPath: string) => {
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({}, "", nextPath);
+    }
+    setPath(nextPath);
+  };
+
+  let page = <HomePage onNavigate={navigate} />;
+
+  if (route.name === "admin") {
+    page = <AdminPage />;
+  }
+
+  if (route.name === "play") {
+    page = <PlayPage gameId={route.gameId} />;
   }
 
   return (
-    <main className="app-shell">
-      <section className="intro-panel" aria-labelledby="app-title">
-        <p className="intro-kicker">Česká retro soutěž pro hudební večery</p>
-        <h1 id="app-title">Riskuj — hudební kvíz</h1>
-        <p className="intro-text">
-          Základ aplikace je připravený pro herní tabuli, moderátorské ovládání
-          a práci s hudebními ukázkami.
-        </p>
-        <nav className="home-actions" aria-label="Rychlé odkazy">
-          <a href="/admin">Editor</a>
-          <a href="/play/demo-hudebni-riskuj">Spustit demo</a>
-        </nav>
-      </section>
-    </main>
+    <Layout currentPath={path} onNavigate={navigate}>
+      {page}
+    </Layout>
   );
 }

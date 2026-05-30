@@ -1,28 +1,32 @@
-export type QuestionPoints = 100 | 200 | 300 | 400 | 500;
+export type GameRoundType = "question" | "listening" | "common-denominator";
 
-export interface Team {
-  id: string;
-  name: string;
-}
+export type QuestionPoints = number;
 
 export interface AudioAsset {
   id: string;
   src: string;
-  originalName: string;
-  displayName?: string;
-  mimeType: "audio/mpeg";
+  title: string;
+  artist?: string;
   durationSeconds?: number;
+  originalName?: string;
+  displayName?: string;
+  mimeType?: "audio/mpeg";
+  /** Legacy/admin upload URL alias. */
+  url?: string;
 }
 
-export interface Category {
+export interface Team {
+  id: string;
+  name: string;
+  color?: string;
+}
+
+export interface QuestionCategory {
   id: string;
   title: string;
 }
 
-export interface BaseRound {
-  id: string;
-  title: string;
-}
+export type Category = QuestionCategory;
 
 export interface QuestionItem {
   id: string;
@@ -34,61 +38,113 @@ export interface QuestionItem {
   audio?: AudioAsset;
 }
 
-export interface QuestionRound extends BaseRound {
-  type: "question";
-  categories: Category[];
-  items: QuestionItem[];
+export type Question = QuestionItem;
+
+export interface ListeningCategory {
+  id: string;
+  title: string;
 }
+
+export type ListeningGenre = ListeningCategory;
 
 export interface ListeningItem {
   id: string;
-  points: QuestionPoints;
   prompt: string;
+  answer: string;
+  categoryId?: string;
+  points?: QuestionPoints;
   audio?: AudioAsset;
-  trackTitleAnswer: string;
-  artistAnswer: string;
   moderatorNote?: string;
-}
-
-export interface ListeningRound extends BaseRound {
-  type: "listening";
-  items: ListeningItem[];
+  /** Admin editor compatibility fields. */
+  genreId?: string;
+  title?: string;
+  artist?: string;
+  audioUrl?: string;
+  /** PR #17 presenter compatibility fields. */
+  trackTitleAnswer?: string;
+  artistAnswer?: string;
 }
 
 export interface CommonDenominatorClue {
   id: string;
-  prompt: string;
+  order?: number;
+  prompt?: string;
+  answer?: string;
   audio?: AudioAsset;
   moderatorNote?: string;
+  /** Admin editor compatibility field. */
+  text?: string;
+}
+
+export interface BaseRound {
+  id: string;
+  title: string;
+  type: GameRoundType;
+}
+
+export interface QuestionRound extends BaseRound {
+  type: "question";
+  categories: QuestionCategory[];
+  questions: QuestionItem[];
+  /** PR #17 compatibility alias. */
+  items?: QuestionItem[];
+}
+
+export interface ListeningRound extends BaseRound {
+  type: "listening";
+  categories: ListeningCategory[];
+  tracks: ListeningItem[];
+  /** PR #17 compatibility alias. */
+  items?: ListeningItem[];
 }
 
 export interface CommonDenominatorRound extends BaseRound {
   type: "common-denominator";
-  points: QuestionPoints;
   clues: CommonDenominatorClue[];
   answer: string;
+  points?: QuestionPoints;
   moderatorNote?: string;
 }
 
-export type Round = QuestionRound | ListeningRound | CommonDenominatorRound;
+export type GameRound = QuestionRound | ListeningRound | CommonDenominatorRound;
+export type Round = GameRound;
 
 export interface Game {
   id: string;
   title: string;
   teams: Team[];
-  rounds: Round[];
+  rounds: GameRound[];
+  createdAt: string;
+  updatedAt: string;
+  /** Legacy projection used by the current presenter/admin UI until it is fully migrated to rounds. */
+  categories: Category[];
+  /** Legacy projection used by the current presenter/admin UI until it is fully migrated to rounds. */
+  questions: Question[];
+  /** Admin editor compatibility fields for 2./3. kolo. */
+  listeningGenres?: ListeningGenre[];
+  listeningItems?: ListeningItem[];
+  commonDenominator?: {
+    answer: string;
+    clues: CommonDenominatorClue[];
+  };
 }
 
-export type PresenterPhase = "board" | "prompt" | "answer";
+export interface GameSummary {
+  id: string;
+  title: string;
+  updatedAt: string;
+  roundCount: number;
+}
 
 export interface GameSessionState {
   gameId: string;
-  selectedRoundId?: string;
-  selectedItemId?: string;
-  phase: PresenterPhase;
-  revealedItemIds: string[];
-  revealedClueIds: string[];
+  revealedQuestionIds: string[];
+  currentQuestionId?: string;
+  revealedItemIds?: string[];
+  currentRoundId?: string;
+  currentItemId?: string;
   teamScores: Record<string, number>;
   activeTeamId?: string;
-  isFinalized: boolean;
+  isFinished: boolean;
+  isFinalized?: boolean;
 }

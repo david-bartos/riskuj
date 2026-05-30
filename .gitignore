@@ -1,9 +1,11 @@
 node_modules
 dist
-data/uploads
 .env
-server/data/games/*.json
-server/data/audio-assets.json
-server/data/uploads/*
-!server/data/games/.gitkeep
-!server/data/uploads/.gitkeep
+
+data/uploads/*
+!data/uploads/.gitkeep
+
+data/games/*
+!data/games/.gitkeep
+
+data/audio-assets.json

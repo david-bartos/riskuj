@@ -1,337 +1,193 @@
-import { useEffect, useMemo, useState } from "react";
-import type {
-  AudioAsset,
-  CommonDenominatorRound,
-  Game,
-  ListeningRound,
-  QuestionRound
-} from "../types/game";
+import { useEffect, useRef, useState } from "react";
+import { gamesClient, type GameSummary } from "../api/gamesClient";
+import GameEditor, { createEmptyGame } from "../components/admin/GameEditor";
+import type { AudioAsset, Game } from "../types/game";
 
-type AudioTarget =
-  | { kind: "question"; roundId: string; itemId: string; label: string }
-  | { kind: "listening"; roundId: string; itemId: string; label: string }
-  | { kind: "common-denominator"; roundId: string; clueId: string; label: string };
-
-const targetKey = (target: AudioTarget) => {
-  if (target.kind === "common-denominator") {
-    return `${target.kind}:${target.roundId}:${target.clueId}`;
-  }
-
-  return `${target.kind}:${target.roundId}:${target.itemId}`;
-};
-
-function buildAudioTargets(game: Game): AudioTarget[] {
-  return game.rounds.flatMap<AudioTarget>((round) => {
-    if (round.type === "question") {
-      return round.items.map((item) => {
-        const category = round.categories.find(
-          (candidate) => candidate.id === item.categoryId
-        );
-        return {
-          kind: "question" as const,
-          roundId: round.id,
-          itemId: item.id,
-          label: `${round.title}: ${category?.title ?? "Otázka"} za ${item.points}`
-        };
-      });
-    }
-
-    if (round.type === "listening") {
-      return round.items.map((item) => ({
-        kind: "listening" as const,
-        roundId: round.id,
-        itemId: item.id,
-        label: `${round.title}: poslech za ${item.points}`
-      }));
-    }
-
-    return round.clues.map((clue, index) => ({
-      kind: "common-denominator" as const,
-      roundId: round.id,
-      clueId: clue.id,
-      label: `${round.title}: nápověda ${index + 1}`
-    }));
-  });
-}
-
-function findAudio(game: Game, target: AudioTarget | null) {
-  if (!target) {
-    return undefined;
-  }
-
-  const round = game.rounds.find((candidate) => candidate.id === target.roundId);
-  if (!round) {
-    return undefined;
-  }
-
-  if (target.kind === "question" && round.type === "question") {
-    return round.items.find((item) => item.id === target.itemId)?.audio;
-  }
-
-  if (target.kind === "listening" && round.type === "listening") {
-    return round.items.find((item) => item.id === target.itemId)?.audio;
-  }
-
-  if (target.kind === "common-denominator" && round.type === "common-denominator") {
-    return round.clues.find((clue) => clue.id === target.clueId)?.audio;
-  }
-
-  return undefined;
-}
-
-function attachAudioToTarget(
-  game: Game,
-  target: AudioTarget | null,
-  asset: AudioAsset
-): Game {
-  if (!target) {
-    return game;
-  }
-
-  return {
-    ...game,
-    rounds: game.rounds.map((round) => {
-      if (round.id !== target.roundId) {
-        return round;
-      }
-
-      if (target.kind === "question" && round.type === "question") {
-        return {
-          ...round,
-          items: round.items.map((item) =>
-            item.id === target.itemId ? { ...item, audio: asset } : item
-          )
-        } satisfies QuestionRound;
-      }
-
-      if (target.kind === "listening" && round.type === "listening") {
-        return {
-          ...round,
-          items: round.items.map((item) =>
-            item.id === target.itemId ? { ...item, audio: asset } : item
-          )
-        } satisfies ListeningRound;
-      }
-
-      if (
-        target.kind === "common-denominator" &&
-        round.type === "common-denominator"
-      ) {
-        return {
-          ...round,
-          clues: round.clues.map((clue) =>
-            clue.id === target.clueId ? { ...clue, audio: asset } : clue
-          )
-        } satisfies CommonDenominatorRound;
-      }
-
-      return round;
-    })
-  };
-}
-
-export default function AdminPage() {
+export function AdminPage() {
+  const [games, setGames] = useState<GameSummary[]>([]);
+  const [selectedGameId, setSelectedGameId] = useState("");
   const [game, setGame] = useState<Game | null>(null);
-  const [assets, setAssets] = useState<AudioAsset[]>([]);
-  const [selectedTargetKey, setSelectedTargetKey] = useState("");
-  const [status, setStatus] = useState("Načítám editor.");
+  const [audioAssets, setAudioAssets] = useState<AudioAsset[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const loadRequestId = useRef(0);
 
   useEffect(() => {
     let isMounted = true;
+    const requestId = ++loadRequestId.current;
 
-    async function loadEditor() {
+    async function loadInitialGame() {
       try {
-        const [gameResponse, assetsResponse] = await Promise.all([
-          fetch("/api/games/demo-hudebni-riskuj"),
-          fetch("/api/audio-assets")
+        setIsLoading(true);
+        const [summaries, assets] = await Promise.all([
+          gamesClient.listGames(),
+          gamesClient.listAudioAssets()
         ]);
-
-        if (!gameResponse.ok || !assetsResponse.ok) {
-          throw new Error("Editor data request failed");
-        }
-
-        const loadedGame = (await gameResponse.json()) as Game;
-        const loadedAssets = (await assetsResponse.json()) as AudioAsset[];
-
-        if (!isMounted) {
+        if (!isMounted || requestId !== loadRequestId.current) {
           return;
         }
 
-        setGame(loadedGame);
-        setAssets(loadedAssets);
-        setSelectedTargetKey(targetKey(buildAudioTargets(loadedGame)[0]));
-        setStatus("");
-      } catch {
-        if (isMounted) {
-          setStatus("Editor se nepodařilo načíst.");
+        setGames(summaries);
+        setAudioAssets(assets);
+        const firstGame = summaries[0];
+        if (firstGame) {
+          const loadedGame = await gamesClient.loadGame(firstGame.id);
+          if (!isMounted || requestId !== loadRequestId.current) {
+            return;
+          }
+          setSelectedGameId(firstGame.id);
+          setGame(loadedGame);
+        } else {
+          setGame(createEmptyGame());
+        }
+      } catch (loadError) {
+        if (!isMounted || requestId !== loadRequestId.current) {
+          return;
+        }
+        const detail = loadError instanceof Error ? loadError.message : "neznámá chyba";
+        setError(`Hry se nepodařilo načíst. ${detail}`);
+        setGame(createEmptyGame());
+      } finally {
+        if (isMounted && requestId === loadRequestId.current) {
+          setIsLoading(false);
         }
       }
     }
 
-    void loadEditor();
+    void loadInitialGame();
 
     return () => {
       isMounted = false;
     };
   }, []);
 
-  const targets = useMemo(() => (game ? buildAudioTargets(game) : []), [game]);
-  const selectedTarget =
-    targets.find((target) => targetKey(target) === selectedTargetKey) ?? null;
-  const currentAudio = game ? findAudio(game, selectedTarget) : undefined;
+  async function handleSelectGame(gameId: string) {
+    const requestId = ++loadRequestId.current;
+    setSelectedGameId(gameId);
+    setStatus(null);
+    setError(null);
 
-  async function handleUpload(file: File | undefined) {
-    if (!file || !game) {
+    if (!gameId) {
+      setIsLoading(false);
       return;
     }
 
-    const formData = new FormData();
-    formData.append("file", file);
-
-    setStatus("Nahrávám MP3.");
-    const response = await fetch("/api/audio-assets", {
-      method: "POST",
-      body: formData
-    });
-
-    if (!response.ok) {
-      setStatus("MP3 se nepodařilo nahrát.");
-      return;
+    try {
+      setIsLoading(true);
+      const loadedGame = await gamesClient.loadGame(gameId);
+      if (requestId === loadRequestId.current) {
+        setGame(loadedGame);
+      }
+    } catch (loadError) {
+      if (requestId === loadRequestId.current) {
+        const detail = loadError instanceof Error ? loadError.message : "neznámá chyba";
+        setError(`Hru se nepodařilo načíst. ${detail}`);
+      }
+    } finally {
+      if (requestId === loadRequestId.current) {
+        setIsLoading(false);
+      }
     }
-
-    const asset = (await response.json()) as AudioAsset;
-    setAssets((currentAssets) => [...currentAssets, asset]);
-    setGame((currentGame) =>
-      currentGame ? attachAudioToTarget(currentGame, selectedTarget, asset) : currentGame
-    );
-    setStatus("Audio je připojené k položce.");
   }
 
-  function handleSelectAsset(assetId: string) {
-    const asset = assets.find((candidate) => candidate.id === assetId);
-    if (!asset) {
-      return;
-    }
-
-    setGame((currentGame) =>
-      currentGame ? attachAudioToTarget(currentGame, selectedTarget, asset) : currentGame
-    );
-    setStatus("Audio z knihovny je připojené.");
+  function handleCreateNewGame() {
+    loadRequestId.current += 1;
+    setSelectedGameId("");
+    setIsLoading(false);
+    setError(null);
+    setStatus("Nová hra je připravená k úpravám.");
+    setGame(createEmptyGame());
   }
 
-  async function handleSave() {
-    if (!game) {
-      return;
+  async function handleUploadAudio(file: File) {
+    const asset = await gamesClient.uploadAudioAsset(file);
+    setAudioAssets((currentAssets) => [...currentAssets, asset]);
+    return asset;
+  }
+
+  async function handleSave(nextGame: Game) {
+    setIsSaving(true);
+    setError(null);
+    setStatus(null);
+
+    try {
+      const savedGame = await gamesClient.saveGame(nextGame);
+      setGame(savedGame);
+      setSelectedGameId(savedGame.id);
+      setGames((currentGames) => {
+        const summary = {
+          id: savedGame.id,
+          title: savedGame.title,
+          updatedAt: savedGame.updatedAt,
+          roundCount: savedGame.rounds.length
+        };
+        const existingIndex = currentGames.findIndex((current) => current.id === savedGame.id);
+        if (existingIndex === -1) {
+          return [...currentGames, summary];
+        }
+        return currentGames.map((current) => (current.id === savedGame.id ? summary : current));
+      });
+      setStatus("Hra byla uložená.");
+    } catch (saveError) {
+      const detail = saveError instanceof Error ? saveError.message : "neznámá chyba";
+      setError(`Hru se nepodařilo uložit. ${detail}`);
+    } finally {
+      setIsSaving(false);
     }
-
-    setStatus("Ukládám hru.");
-    const response = await fetch(`/api/games/${game.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(game)
-    });
-
-    setStatus(response.ok ? "Hra je uložená." : "Hru se nepodařilo uložit.");
   }
 
   return (
-    <main className="admin-editor">
-      <h1>Editor hry</h1>
+    <main className="admin-shell">
+      <header className="admin-header">
+        <p className="intro-kicker">Moderátorský pult</p>
+        <h1>Editor hry</h1>
+        <p className="intro-text">Upravte otázky, poslechové ukázky a třetí kolo.</p>
+      </header>
 
-      {!game ? (
-        <p className="status-message">{status}</p>
-      ) : (
-        <div className="editor-grid">
-          <label className="editor-field">
-            <span>Položka pro audio</span>
-            <select
-              value={selectedTargetKey}
-              onChange={(event) => setSelectedTargetKey(event.target.value)}
-            >
-              {targets.map((target) => (
-                <option key={targetKey(target)} value={targetKey(target)}>
-                  {target.label}
-                </option>
-              ))}
-            </select>
-          </label>
+      <section className="admin-toolbar" aria-label="Správa her">
+        <label className="field-stack">
+          <span>Načíst existující hru</span>
+          <select
+            value={selectedGameId}
+            onChange={(event) => void handleSelectGame(event.target.value)}
+          >
+            <option value="">Nová nebo nevybraná hra</option>
+            {games.map((summary) => (
+              <option key={summary.id} value={summary.id}>
+                {summary.title}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" onClick={handleCreateNewGame}>
+          Nová hra
+        </button>
+      </section>
 
-          <label className="editor-field">
-            <span>Nahrát MP3 k vybrané položce</span>
-            <input
-              accept="audio/mpeg,.mp3"
-              type="file"
-              onChange={(event) => void handleUpload(event.target.files?.[0])}
-            />
-          </label>
-
-          <label className="editor-field">
-            <span>Vybrat z nahraných MP3</span>
-            <select
-              value=""
-              onChange={(event) => handleSelectAsset(event.target.value)}
-            >
-              <option value="">Vyberte audio asset</option>
-              {assets.map((asset) => (
-                <option key={asset.id} value={asset.id}>
-                  {asset.originalName}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <section className="audio-preview" aria-label="Aktuální audio">
-            <h2>Aktuální audio</h2>
-            {currentAudio ? (
-              <>
-                <dl>
-                  <div>
-                    <dt>Název v editoru</dt>
-                    <dd>{currentAudio.displayName ?? currentAudio.originalName}</dd>
-                  </div>
-                  <div>
-                    <dt>Soubor</dt>
-                    <dd>{currentAudio.originalName}</dd>
-                  </div>
-                  <div>
-                    <dt>URL</dt>
-                    <dd>{currentAudio.src}</dd>
-                  </div>
-                </dl>
-                <audio
-                  aria-label="Náhled audio ukázky"
-                  controls
-                  src={currentAudio.src}
-                />
-              </>
-            ) : (
-              <p>Vybraná položka zatím nemá audio.</p>
-            )}
-          </section>
-
-          {assets.length > 0 && (
-            <section className="asset-list" aria-label="Audio knihovna">
-              <h2>Knihovna MP3</h2>
-              {assets.map((asset) => (
-                <button
-                  key={asset.id}
-                  type="button"
-                  onClick={() => handleSelectAsset(asset.id)}
-                >
-                  {asset.originalName}
-                </button>
-              ))}
-            </section>
-          )}
-
-          <div className="editor-actions">
-            <button type="button" onClick={() => void handleSave()}>
-              Uložit hru
-            </button>
-            {status && <p className="status-message">{status}</p>}
-          </div>
-        </div>
-      )}
+      {isLoading ? <p role="status">Načítám hry...</p> : null}
+      {error ? (
+        <p className="form-message form-message-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {status ? (
+        <p className="form-message" role="status">
+          {status}
+        </p>
+      ) : null}
+      {game ? (
+        <GameEditor
+          initialGame={game}
+          audioAssets={audioAssets}
+          isSaving={isSaving}
+          onSave={handleSave}
+          onUploadAudio={handleUploadAudio}
+        />
+      ) : null}
     </main>
   );
 }
+
+export default AdminPage;

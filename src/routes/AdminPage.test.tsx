@@ -6,6 +6,7 @@ import AdminPage from "./AdminPage";
 const uploadedAsset = {
   id: "audio-uploaded",
   src: "/uploads/uploaded.mp3",
+  title: "Uploaded preview",
   originalName: "uploaded.mp3",
   displayName: "Uploaded preview",
   mimeType: "audio/mpeg"
@@ -18,6 +19,17 @@ describe("AdminPage", () => {
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
 
+        if (url === "/api/games" && !init) {
+          return Response.json([
+            {
+              id: demoGame.id,
+              title: demoGame.title,
+              updatedAt: demoGame.updatedAt,
+              roundCount: demoGame.rounds.length
+            }
+          ]);
+        }
+
         if (url === "/api/games/demo-hudebni-riskuj" && !init) {
           return Response.json(demoGame);
         }
@@ -26,8 +38,8 @@ describe("AdminPage", () => {
           return Response.json([]);
         }
 
-        if (url === "/api/audio-assets" && init?.method === "POST") {
-          return Response.json(uploadedAsset, { status: 201 });
+        if (url === "/api/uploads/audio" && init?.method === "POST") {
+          return Response.json(uploadedAsset);
         }
 
         if (url === "/api/games/demo-hudebni-riskuj" && init?.method === "PUT") {
@@ -50,16 +62,20 @@ describe("AdminPage", () => {
       await screen.findByRole("heading", { name: "Editor hry" })
     ).toBeInTheDocument();
 
-    const fileInput = await screen.findByLabelText(
-      "Nahrát MP3 k vybrané položce"
-    );
+    const fileInput = (await screen.findAllByLabelText("Nahrát MP3 k položce"))[0];
     fireEvent.change(fileInput, {
       target: {
         files: [new File(["fake"], "uploaded.mp3", { type: "audio/mpeg" })]
       }
     });
 
-    expect(await screen.findByText("Uploaded preview")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen
+          .getAllByLabelText("Náhled audio ukázky")
+          .some((audio) => audio.getAttribute("src") === "/uploads/uploaded.mp3")
+      ).toBe(true);
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Uložit hru" }));
 
@@ -68,7 +84,7 @@ describe("AdminPage", () => {
         "/api/games/demo-hudebni-riskuj",
         expect.objectContaining({
           method: "PUT",
-          headers: { "Content-Type": "application/json" }
+          headers: { "content-type": "application/json" }
         })
       );
     });
