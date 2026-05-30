@@ -1,17 +1,104 @@
-import type { Game, ListeningGenre, ListeningItem, Question } from "../../types/game";
+import { useId, useState } from "react";
+import type { AudioAsset, Game, ListeningGenre, ListeningItem, Question } from "../../types/game";
 
 type AdminCommonDenominatorRound = NonNullable<Game["commonDenominator"]>;
+
+type AudioAttachmentProps = {
+  audio?: AudioAsset;
+  audioAssets: AudioAsset[];
+  label: string;
+  onChange: (audio: AudioAsset | undefined) => void;
+  onUploadAudio?: (file: File) => Promise<AudioAsset>;
+};
+
+function getAudioLabel(audio: AudioAsset) {
+  return audio.displayName ?? audio.title ?? audio.originalName ?? audio.src;
+}
+
+function AudioAttachmentEditor({
+  audio,
+  audioAssets,
+  label,
+  onChange,
+  onUploadAudio
+}: AudioAttachmentProps) {
+  const selectId = useId();
+  const uploadId = useId();
+  const [status, setStatus] = useState("");
+
+  async function handleUpload(file: File | undefined) {
+    if (!file || !onUploadAudio) {
+      return;
+    }
+
+    setStatus("Nahrávám MP3...");
+    try {
+      const asset = await onUploadAudio(file);
+      onChange(asset);
+      setStatus("Audio je připojené.");
+    } catch {
+      setStatus("MP3 se nepodařilo nahrát.");
+    }
+  }
+
+  return (
+    <section className="audio-attachment" aria-label={label}>
+      <div className="editor-grid">
+        <label className="field-stack" htmlFor={selectId}>
+          <span>Vybrat MP3 z knihovny</span>
+          <select
+            id={selectId}
+            value={audio?.id ?? ""}
+            onChange={(event) => {
+              const asset = audioAssets.find((candidate) => candidate.id === event.target.value);
+              onChange(asset);
+            }}
+          >
+            <option value="">Bez audia</option>
+            {audioAssets.map((asset) => (
+              <option key={asset.id} value={asset.id}>
+                {getAudioLabel(asset)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field-stack" htmlFor={uploadId}>
+          <span>Nahrát MP3 k položce</span>
+          <input
+            accept="audio/mpeg,.mp3"
+            id={uploadId}
+            type="file"
+            onChange={(event) => void handleUpload(event.target.files?.[0])}
+          />
+        </label>
+      </div>
+
+      {audio ? (
+        <div className="audio-preview" aria-label="Aktuální audio">
+          <span>Aktuální audio: {getAudioLabel(audio)}</span>
+          <audio aria-label="Náhled audio ukázky" controls src={audio.src} />
+        </div>
+      ) : null}
+      {status ? <p role="status">{status}</p> : null}
+    </section>
+  );
+}
 
 type FirstRoundQuestionEditorProps = {
   question: Question;
   categoryTitle: string;
+  audioAssets: AudioAsset[];
   onChange: (question: Question) => void;
+  onUploadAudio?: (file: File) => Promise<AudioAsset>;
 };
 
 export function FirstRoundQuestionEditor({
   question,
   categoryTitle,
-  onChange
+  audioAssets,
+  onChange,
+  onUploadAudio
 }: FirstRoundQuestionEditorProps) {
   const suffix = `${question.points} bodů v kategorii ${categoryTitle}`;
 
@@ -41,6 +128,13 @@ export function FirstRoundQuestionEditor({
           }
         />
       </label>
+      <AudioAttachmentEditor
+        audio={question.audio}
+        audioAssets={audioAssets}
+        label={`Audio otázky ${suffix}`}
+        onChange={(audio) => onChange({ ...question, audio })}
+        onUploadAudio={onUploadAudio}
+      />
     </article>
   );
 }
@@ -48,14 +142,18 @@ export function FirstRoundQuestionEditor({
 type ListeningItemEditorProps = {
   item: ListeningItem;
   genres: ListeningGenre[];
+  audioAssets: AudioAsset[];
   onChange: (item: ListeningItem) => void;
+  onUploadAudio?: (file: File) => Promise<AudioAsset>;
   onRemove: () => void;
 };
 
 export function ListeningItemEditor({
   item,
   genres,
+  audioAssets,
   onChange,
+  onUploadAudio,
   onRemove
 }: ListeningItemEditorProps) {
   return (
@@ -94,15 +192,6 @@ export function ListeningItemEditor({
             onChange={(event) => onChange({ ...item, artist: event.target.value })}
           />
         </label>
-        <label className="field-stack">
-          <span>Audio URL</span>
-          <input
-            value={item.audioUrl ?? ""}
-            onChange={(event) =>
-              onChange({ ...item, audioUrl: event.target.value || undefined })
-            }
-          />
-        </label>
       </div>
       <label className="field-stack">
         <span>Zadání poslechové položky</span>
@@ -118,20 +207,31 @@ export function ListeningItemEditor({
           onChange={(event) => onChange({ ...item, answer: event.target.value })}
         />
       </label>
+      <AudioAttachmentEditor
+        audio={item.audio}
+        audioAssets={audioAssets}
+        label="Audio poslechové položky"
+        onChange={(audio) => onChange({ ...item, audio, audioUrl: audio?.src })}
+        onUploadAudio={onUploadAudio}
+      />
     </article>
   );
 }
 
 type CommonDenominatorEditorProps = {
   round: AdminCommonDenominatorRound;
+  audioAssets: AudioAsset[];
   onChange: (round: AdminCommonDenominatorRound) => void;
+  onUploadAudio?: (file: File) => Promise<AudioAsset>;
   onAddClue: () => void;
   onRemoveClue: (clueId: string) => void;
 };
 
 export function CommonDenominatorEditor({
   round,
+  audioAssets,
   onChange,
+  onUploadAudio,
   onAddClue,
   onRemoveClue
 }: CommonDenominatorEditorProps) {
@@ -146,22 +246,38 @@ export function CommonDenominatorEditor({
       </label>
       {round.clues.map((clue, index) => (
         <div className="field-row" key={clue.id}>
-          <label className="field-stack">
-            <span>{`Indicie ${index + 1}`}</span>
-            <textarea
-              value={clue.text ?? clue.prompt ?? ""}
-              onChange={(event) =>
+          <div className="field-stack">
+            <label className="field-stack">
+              <span>{`Indicie ${index + 1}`}</span>
+              <textarea
+                value={clue.text ?? clue.prompt ?? ""}
+                onChange={(event) =>
+                  onChange({
+                    ...round,
+                    clues: round.clues.map((current) =>
+                      current.id === clue.id
+                        ? { ...current, text: event.target.value, prompt: event.target.value }
+                        : current
+                    )
+                  })
+                }
+              />
+            </label>
+            <AudioAttachmentEditor
+              audio={clue.audio}
+              audioAssets={audioAssets}
+              label={`Audio indicie ${index + 1}`}
+              onChange={(audio) =>
                 onChange({
                   ...round,
                   clues: round.clues.map((current) =>
-                    current.id === clue.id
-                      ? { ...current, text: event.target.value, prompt: event.target.value }
-                      : current
+                    current.id === clue.id ? { ...current, audio } : current
                   )
                 })
               }
+              onUploadAudio={onUploadAudio}
             />
-          </label>
+          </div>
           <button
             className="danger-button button-compact"
             type="button"

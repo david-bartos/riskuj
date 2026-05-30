@@ -7,3 +7,5 @@ data/uploads/*
 
 data/games/*
 !data/games/.gitkeep
+
+data/audio-assets.json

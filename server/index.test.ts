@@ -9,6 +9,7 @@ import { GamesRepository } from "./gamesRepository";
 
 let gamesDirectory: string;
 let uploadsDir: string;
+let audioAssetsPath: string;
 
 const savedGame: Game = {
   id: "ulozena-hra",
@@ -23,19 +24,25 @@ const savedGame: Game = {
 
 const mp3Bytes = Buffer.from("ID3 test mp3 payload");
 
+function createTestServer() {
+  return createServer({ gamesDirectory, uploadsDir, audioAssetsPath });
+}
+
 describe("server", () => {
   beforeEach(async () => {
     gamesDirectory = await fs.mkdtemp(join(tmpdir(), "riskuj-api-"));
     uploadsDir = await fs.mkdtemp(join(tmpdir(), "riskuj-uploads-"));
+    audioAssetsPath = join(await fs.mkdtemp(join(tmpdir(), "riskuj-audio-assets-")), "assets.json");
   });
 
   afterEach(async () => {
     await fs.rm(gamesDirectory, { force: true, recursive: true });
     await fs.rm(uploadsDir, { force: true, recursive: true });
+    await fs.rm(audioAssetsPath, { force: true });
   });
 
   it("vrací JSON stav aplikace na /api/health", async () => {
-    const app = createServer({ gamesDirectory, uploadsDir });
+    const app = createTestServer();
 
     const response = await request(app).get("/api/health").expect(200);
 
@@ -46,7 +53,7 @@ describe("server", () => {
   it("vrátí seznam uložených her", async () => {
     const repository = new GamesRepository(gamesDirectory);
     await repository.save(savedGame);
-    const app = createServer({ gamesDirectory, uploadsDir });
+    const app = createTestServer();
 
     const response = await request(app).get("/api/games").expect(200);
 
@@ -63,7 +70,7 @@ describe("server", () => {
   it("načte detail hry podle ID", async () => {
     const repository = new GamesRepository(gamesDirectory);
     await repository.save(savedGame);
-    const app = createServer({ gamesDirectory, uploadsDir });
+    const app = createTestServer();
 
     const response = await request(app).get("/api/games/ulozena-hra").expect(200);
 
@@ -71,7 +78,7 @@ describe("server", () => {
   });
 
   it("vrátí českou 404 pro chybějící hru", async () => {
-    const app = createServer({ gamesDirectory, uploadsDir });
+    const app = createTestServer();
 
     const response = await request(app).get("/api/games/chybi").expect(404);
 
@@ -79,7 +86,7 @@ describe("server", () => {
   });
 
   it("vytvoří prázdnou hru z názvu", async () => {
-    const app = createServer({ gamesDirectory, uploadsDir });
+    const app = createTestServer();
 
     const response = await request(app)
       .post("/api/games")
@@ -99,7 +106,7 @@ describe("server", () => {
   });
 
   it("uloží validní kompletní hru přes POST", async () => {
-    const app = createServer({ gamesDirectory, uploadsDir });
+    const app = createTestServer();
 
     const response = await request(app).post("/api/games").send(savedGame).expect(201);
 
@@ -107,7 +114,7 @@ describe("server", () => {
   });
 
   it("odmítne kompletní POST payload s nebezpečným ID jako validační chybu", async () => {
-    const app = createServer({ gamesDirectory, uploadsDir });
+    const app = createTestServer();
 
     const response = await request(app)
       .post("/api/games")
@@ -123,7 +130,7 @@ describe("server", () => {
   it("uloží změnu hry přes PUT a aktualizuje updatedAt", async () => {
     const repository = new GamesRepository(gamesDirectory);
     await repository.save(savedGame);
-    const app = createServer({ gamesDirectory, uploadsDir });
+    const app = createTestServer();
 
     const response = await request(app)
       .put("/api/games/ulozena-hra")
@@ -137,7 +144,7 @@ describe("server", () => {
   });
 
   it("odmítne PUT s rozdílným ID v adrese a těle", async () => {
-    const app = createServer({ gamesDirectory, uploadsDir });
+    const app = createTestServer();
 
     const response = await request(app)
       .put("/api/games/jedna")
@@ -151,7 +158,7 @@ describe("server", () => {
   });
 
   it("odmítne nevalidní payload s českými detaily", async () => {
-    const app = createServer({ gamesDirectory, uploadsDir });
+    const app = createTestServer();
 
     const response = await request(app)
       .post("/api/games")
@@ -163,23 +170,27 @@ describe("server", () => {
     expect(response.body.details).toContain("Název hry musí být neprázdný text.");
   });
 
-  it("uloží MP3 upload a vrátí AudioAsset", async () => {
-    const app = createServer({ gamesDirectory, uploadsDir });
+  it("uloží MP3 upload pod neprůhledným UUID src a vrátí AudioAsset", async () => {
+    const app = createTestServer();
 
     const response = await request(app)
       .post("/api/uploads/audio")
       .field("title", "Znělka finále")
       .attach("file", mp3Bytes, {
         contentType: "audio/mpeg",
-        filename: "finale.mp3",
+        filename: "Queen - finale.mp3"
       })
       .expect(200);
 
     expect(response.body).toEqual({
-      id: expect.stringMatching(/^audio-\d+-[a-f0-9]+$/),
-      src: expect.stringMatching(/^\/uploads\/audio-\d+-[a-f0-9]+\.mp3$/),
+      id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      src: expect.stringMatching(/^\/uploads\/[0-9a-f-]{36}\.mp3$/),
       title: "Znělka finále",
+      originalName: "Queen - finale.mp3",
+      displayName: "Znělka finále",
+      mimeType: "audio/mpeg"
     });
+    expect(response.body.src.toLowerCase()).not.toContain("queen");
 
     const savedFilename = basename(response.body.src);
     const savedPath = join(uploadsDir, savedFilename);
@@ -187,39 +198,43 @@ describe("server", () => {
     await expect(fs.readFile(savedPath)).resolves.toEqual(mp3Bytes);
   });
 
+  it("persistuje audio knihovnu a podporuje kompatibilní /api/audio-assets endpoint", async () => {
+    const app = createTestServer();
+
+    const uploadResponse = await request(app)
+      .post("/api/audio-assets")
+      .attach("file", mp3Bytes, {
+        contentType: "audio/mpeg",
+        filename: "Queen - Bohemian Rhapsody.mp3"
+      })
+      .expect(201);
+
+    expect(uploadResponse.body.src).toMatch(/^\/uploads\/[0-9a-f-]{36}\.mp3$/);
+    expect(uploadResponse.body.src.toLowerCase()).not.toContain("queen");
+    expect(uploadResponse.body.src.toLowerCase()).not.toContain("bohemian");
+
+    const listResponse = await request(app).get("/api/audio-assets").expect(200);
+    expect(listResponse.body).toEqual([uploadResponse.body]);
+  });
+
   it("přijme soubor s příponou .mp3 i při obecnějším MIME typu", async () => {
-    const app = createServer({ gamesDirectory, uploadsDir });
+    const app = createTestServer();
 
     const response = await request(app)
       .post("/api/uploads/audio")
       .attach("file", mp3Bytes, {
         contentType: "application/octet-stream",
-        filename: "intro.MP3",
+        filename: "intro.MP3"
       })
       .expect(200);
 
     expect(response.body.title).toBe("intro");
-    expect(response.body.src).toMatch(/^\/uploads\/audio-\d+-[a-f0-9]+\.mp3$/);
+    expect(response.body.src).toMatch(/^\/uploads\/[0-9a-f-]{36}\.mp3$/);
     expect(existsSync(join(uploadsDir, basename(response.body.src)))).toBe(true);
   });
 
-  it("odvodí title z názvu souboru, když title chybí nebo je prázdný", async () => {
-    const app = createServer({ gamesDirectory, uploadsDir });
-
-    const response = await request(app)
-      .post("/api/uploads/audio")
-      .field("title", "   ")
-      .attach("file", mp3Bytes, {
-        contentType: "audio/mpeg",
-        filename: "ceske-hity.mp3",
-      })
-      .expect(200);
-
-    expect(response.body.title).toBe("ceske-hity");
-  });
-
   it("vrátí 400 JSON error, když chybí soubor", async () => {
-    const app = createServer({ gamesDirectory, uploadsDir });
+    const app = createTestServer();
 
     const response = await request(app)
       .post("/api/uploads/audio")
@@ -227,53 +242,53 @@ describe("server", () => {
       .expect(400);
 
     expect(response.body).toEqual({
-      error: 'MP3 file is required in multipart field "file".',
+      error: 'MP3 file is required in multipart field "file".'
     });
     expect(response.headers["content-type"]).toContain("application/json");
   });
 
   it("vrátí 400 JSON error pro jiný než MP3 upload", async () => {
-    const app = createServer({ gamesDirectory, uploadsDir });
+    const app = createTestServer();
 
     const response = await request(app)
       .post("/api/uploads/audio")
       .attach("file", Buffer.from("not audio"), {
         contentType: "text/plain",
-        filename: "notes.txt",
+        filename: "notes.txt"
       })
       .expect(400);
 
     expect(response.body).toEqual({
-      error: "Only MP3 audio uploads are supported.",
+      error: "Only MP3 audio uploads are supported."
     });
     await expect(fs.readdir(uploadsDir)).resolves.toEqual([]);
   });
 
   it("vrátí 400 JSON error pro neočekávané multipart pole", async () => {
-    const app = createServer({ gamesDirectory, uploadsDir });
+    const app = createTestServer();
 
     const response = await request(app)
       .post("/api/uploads/audio")
       .attach("audio", mp3Bytes, {
         contentType: "audio/mpeg",
-        filename: "wrong-field.mp3",
+        filename: "wrong-field.mp3"
       })
       .expect(400);
 
     expect(response.body).toEqual({
-      error: 'MP3 file is required in multipart field "file".',
+      error: 'MP3 file is required in multipart field "file".'
     });
     await expect(fs.readdir(uploadsDir)).resolves.toEqual([]);
   });
 
   it("zpřístupní uložený upload přes vrácené src", async () => {
-    const app = createServer({ gamesDirectory, uploadsDir });
+    const app = createTestServer();
 
     const uploadResponse = await request(app)
       .post("/api/uploads/audio")
       .attach("file", mp3Bytes, {
         contentType: "audio/mpeg",
-        filename: "playback.mp3",
+        filename: "playback.mp3"
       })
       .expect(200);
 

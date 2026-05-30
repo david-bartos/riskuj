@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { gamesClient, type GameSummary } from "../api/gamesClient";
 import GameEditor, { createEmptyGame } from "../components/admin/GameEditor";
-import type { Game } from "../types/game";
+import type { AudioAsset, Game } from "../types/game";
 
 export function AdminPage() {
   const [games, setGames] = useState<GameSummary[]>([]);
   const [selectedGameId, setSelectedGameId] = useState("");
   const [game, setGame] = useState<Game | null>(null);
+  const [audioAssets, setAudioAssets] = useState<AudioAsset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,12 +21,16 @@ export function AdminPage() {
     async function loadInitialGame() {
       try {
         setIsLoading(true);
-        const summaries = await gamesClient.listGames();
+        const [summaries, assets] = await Promise.all([
+          gamesClient.listGames(),
+          gamesClient.listAudioAssets()
+        ]);
         if (!isMounted || requestId !== loadRequestId.current) {
           return;
         }
 
         setGames(summaries);
+        setAudioAssets(assets);
         const firstGame = summaries[0];
         if (firstGame) {
           const loadedGame = await gamesClient.loadGame(firstGame.id);
@@ -96,6 +101,12 @@ export function AdminPage() {
     setGame(createEmptyGame());
   }
 
+  async function handleUploadAudio(file: File) {
+    const asset = await gamesClient.uploadAudioAsset(file);
+    setAudioAssets((currentAssets) => [...currentAssets, asset]);
+    return asset;
+  }
+
   async function handleSave(nextGame: Game) {
     setIsSaving(true);
     setError(null);
@@ -110,7 +121,7 @@ export function AdminPage() {
           id: savedGame.id,
           title: savedGame.title,
           updatedAt: savedGame.updatedAt,
-          roundCount: savedGame.rounds.length,
+          roundCount: savedGame.rounds.length
         };
         const existingIndex = currentGames.findIndex((current) => current.id === savedGame.id);
         if (existingIndex === -1) {
@@ -166,7 +177,15 @@ export function AdminPage() {
           {status}
         </p>
       ) : null}
-      {game ? <GameEditor initialGame={game} isSaving={isSaving} onSave={handleSave} /> : null}
+      {game ? (
+        <GameEditor
+          initialGame={game}
+          audioAssets={audioAssets}
+          isSaving={isSaving}
+          onSave={handleSave}
+          onUploadAudio={handleUploadAudio}
+        />
+      ) : null}
     </main>
   );
 }

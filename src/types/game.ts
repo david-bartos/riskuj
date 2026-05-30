@@ -8,6 +8,9 @@ export interface AudioAsset {
   title: string;
   artist?: string;
   durationSeconds?: number;
+  originalName?: string;
+  displayName?: string;
+  mimeType?: "audio/mpeg";
   /** Legacy/admin upload URL alias. */
   url?: string;
 }
@@ -57,6 +60,9 @@ export interface ListeningItem {
   title?: string;
   artist?: string;
   audioUrl?: string;
+  /** PR #17 presenter compatibility fields. */
+  trackTitleAnswer?: string;
+  artistAnswer?: string;
 }
 
 export interface CommonDenominatorClue {
@@ -65,6 +71,7 @@ export interface CommonDenominatorClue {
   prompt?: string;
   answer?: string;
   audio?: AudioAsset;
+  moderatorNote?: string;
   /** Admin editor compatibility field. */
   text?: string;
 }
@@ -79,21 +86,28 @@ export interface QuestionRound extends BaseRound {
   type: "question";
   categories: QuestionCategory[];
   questions: QuestionItem[];
+  /** PR #17 compatibility alias. */
+  items?: QuestionItem[];
 }
 
 export interface ListeningRound extends BaseRound {
   type: "listening";
   categories: ListeningCategory[];
   tracks: ListeningItem[];
+  /** PR #17 compatibility alias. */
+  items?: ListeningItem[];
 }
 
 export interface CommonDenominatorRound extends BaseRound {
   type: "common-denominator";
   clues: CommonDenominatorClue[];
   answer: string;
+  points?: QuestionPoints;
+  moderatorNote?: string;
 }
 
 export type GameRound = QuestionRound | ListeningRound | CommonDenominatorRound;
+export type Round = GameRound;
 
 export interface Game {
   id: string;

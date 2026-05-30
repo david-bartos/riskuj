@@ -1,4 +1,4 @@
-import type { Game, GameSummary } from "../types/game";
+import type { AudioAsset, Game, GameSummary } from "../types/game";
 export type { GameSummary } from "../types/game";
 import { demoGame } from "../data/demoGame";
 
@@ -13,13 +13,19 @@ export class GamesClientError extends Error {
   }
 }
 
-const localGames = new Map<string, Game>([[demoGame.id, demoGame]]);
+const localGames = new Map<string, Game>([
+  [demoGame.id, demoGame],
+  ["demo", demoGame]
+]);
 
 export async function listGames(): Promise<GameSummary[]> {
   try {
     return await requestJson<GameSummary[]>("/api/games");
   } catch {
-    return Array.from(localGames.values()).map((game) => ({
+    const uniqueGames = Array.from(
+      new Map(Array.from(localGames.values()).map((game) => [game.id, game])).values()
+    );
+    return uniqueGames.map((game) => ({
       id: game.id,
       title: game.title,
       updatedAt: game.updatedAt,
@@ -67,11 +73,35 @@ export async function saveGame(game: Game): Promise<Game> {
   }
 }
 
+export async function listAudioAssets(): Promise<AudioAsset[]> {
+  try {
+    return await requestJson<AudioAsset[]>("/api/audio-assets");
+  } catch {
+    return [];
+  }
+}
+
+export async function uploadAudioAsset(file: File, title?: string): Promise<AudioAsset> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  if (title?.trim()) {
+    formData.append("title", title.trim());
+  }
+
+  return requestJson<AudioAsset>("/api/uploads/audio", {
+    method: "POST",
+    body: formData
+  });
+}
+
 export const gamesClient = {
   listGames,
   loadGame,
   createGame,
   saveGame,
+  listAudioAssets,
+  uploadAudioAsset,
 };
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {

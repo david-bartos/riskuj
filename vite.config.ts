@@ -7,7 +7,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      "/api": `http://localhost:${apiPort}`
+      "/api": `http://localhost:${apiPort}`,
+      "/uploads": `http://localhost:${apiPort}`
     }
   },
   test: {

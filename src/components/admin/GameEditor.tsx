@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type {
+  AudioAsset,
   Category,
   Game,
   ListeningGenre,
@@ -24,6 +25,11 @@ type EditableGame = Game & {
   listeningGenres: ListeningGenre[];
   listeningItems: ListeningItem[];
   commonDenominator: NonNullable<Game["commonDenominator"]>;
+};
+
+type AudioEditorProps = {
+  audioAssets: AudioAsset[];
+  onUploadAudio?: (file: File) => Promise<AudioAsset>;
 };
 
 export function normalizeGame(game: Game): EditableGame {
@@ -65,6 +71,55 @@ export function createEmptyGame(): Game {
   };
 }
 
+export function prepareGameForSave(game: EditableGame): Game {
+  const questionRound = game.rounds.find((round) => round.type === "question");
+  const listeningRound = game.rounds.find((round) => round.type === "listening");
+  const commonRound = game.rounds.find((round) => round.type === "common-denominator");
+
+  return {
+    ...game,
+    rounds: [
+      {
+        id: questionRound?.id ?? "round-otazky",
+        type: "question",
+        title: questionRound?.title ?? "Riskuj",
+        categories: game.categories,
+        questions: game.questions,
+        items: game.questions
+      },
+      {
+        id: listeningRound?.id ?? "round-poslech",
+        type: "listening",
+        title: listeningRound?.title ?? "Poslechové kolo",
+        categories: game.listeningGenres,
+        tracks: game.listeningItems.map((item) => ({
+          ...item,
+          categoryId: item.categoryId ?? item.genreId ?? game.listeningGenres[0]?.id ?? "",
+          genreId: item.genreId ?? item.categoryId,
+          points: item.points ?? 100,
+          trackTitleAnswer: item.trackTitleAnswer ?? item.title ?? item.answer,
+          artistAnswer: item.artistAnswer ?? item.artist ?? "",
+          audioUrl: item.audio?.src ?? item.audioUrl
+        })),
+        items: game.listeningItems
+      },
+      {
+        id: commonRound?.id ?? "round-spolecny-jmenovatel",
+        type: "common-denominator",
+        title: commonRound?.title ?? "Společný jmenovatel",
+        points: commonRound?.points ?? 300,
+        answer: game.commonDenominator.answer,
+        moderatorNote: commonRound?.moderatorNote,
+        clues: game.commonDenominator.clues.map((clue, index) => ({
+          ...clue,
+          order: clue.order ?? index + 1,
+          prompt: clue.prompt ?? clue.text ?? ""
+        }))
+      }
+    ]
+  };
+}
+
 export function validateGame(game: EditableGame): string[] {
   const messages: string[] = [];
 
@@ -95,11 +150,19 @@ export function validateGame(game: EditableGame): string[] {
 
 type GameEditorProps = {
   initialGame: Game;
+  audioAssets?: AudioAsset[];
   isSaving?: boolean;
+  onUploadAudio?: (file: File) => Promise<AudioAsset>;
   onSave: (game: Game) => void | Promise<void>;
 };
 
-export default function GameEditor({ initialGame, isSaving = false, onSave }: GameEditorProps) {
+export default function GameEditor({
+  initialGame,
+  audioAssets = [],
+  isSaving = false,
+  onUploadAudio,
+  onSave
+}: GameEditorProps) {
   const [game, setGame] = useState(() => normalizeGame(initialGame));
   const [errors, setErrors] = useState<string[]>([]);
 
@@ -194,7 +257,7 @@ export default function GameEditor({ initialGame, isSaving = false, onSave }: Ga
       return;
     }
 
-    await onSave(game);
+    await onSave(prepareGameForSave(game));
   }
 
   return (
@@ -253,7 +316,9 @@ export default function GameEditor({ initialGame, isSaving = false, onSave }: Ga
                   key={question.id}
                   question={question}
                   categoryTitle={category.title || "bez názvu"}
+                  audioAssets={audioAssets}
                   onChange={updateQuestion}
+                  onUploadAudio={onUploadAudio}
                 />
               ))}
             </div>
@@ -298,7 +363,9 @@ export default function GameEditor({ initialGame, isSaving = false, onSave }: Ga
               key={item.id}
               item={item}
               genres={game.listeningGenres}
+              audioAssets={audioAssets}
               onChange={updateListeningItem}
+              onUploadAudio={onUploadAudio}
               onRemove={() =>
                 setGame((current) => ({
                   ...current,
@@ -317,6 +384,8 @@ export default function GameEditor({ initialGame, isSaving = false, onSave }: Ga
           onChange={(commonDenominator) =>
             setGame((current) => ({ ...current, commonDenominator }))
           }
+          audioAssets={audioAssets}
+          onUploadAudio={onUploadAudio}
           onAddClue={() =>
             setGame((current) => ({
               ...current,

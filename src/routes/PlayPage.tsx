@@ -1,141 +1,418 @@
 import { useEffect, useMemo, useState } from "react";
-import { GameBoard } from "../components/game/GameBoard";
-import { demoGame } from "../data/demoGame";
-import { useGameSession } from "../hooks/useGameSession";
+import { gamesClient } from "../api/gamesClient";
+import type {
+  CommonDenominatorRound,
+  Game,
+  ListeningItem,
+  ListeningRound,
+  QuestionItem,
+  QuestionRound
+} from "../types/game";
+
+type Phase = "board" | "prompt" | "answer";
+
+type SelectedTarget =
+  | { kind: "question"; roundId: string; itemId: string }
+  | { kind: "listening"; roundId: string; itemId: string }
+  | { kind: "common-denominator"; roundId: string };
+
+type SelectedContent =
+  | {
+      kind: "question";
+      round: QuestionRound;
+      item: QuestionItem;
+      points: number;
+    }
+  | {
+      kind: "listening";
+      round: ListeningRound;
+      item: ListeningItem;
+      points: number;
+    }
+  | {
+      kind: "common-denominator";
+      round: CommonDenominatorRound;
+      points: number;
+    };
 
 type PlayPageProps = {
   gameId: string;
 };
 
-const supportedGameId = "demo";
+function selectedId(target: SelectedTarget) {
+  if (target.kind === "common-denominator") {
+    return `${target.kind}:${target.roundId}`;
+  }
+
+  return `${target.kind}:${target.roundId}:${target.itemId}`;
+}
+
+function questionItems(round: QuestionRound) {
+  return round.questions.length > 0 ? round.questions : round.items ?? [];
+}
+
+function listeningItems(round: ListeningRound) {
+  return round.tracks.length > 0 ? round.tracks : round.items ?? [];
+}
+
+function listeningAnswerTitle(item: ListeningItem) {
+  return item.trackTitleAnswer ?? item.title ?? item.answer;
+}
+
+function listeningAnswerArtist(item: ListeningItem) {
+  return item.artistAnswer ?? item.artist ?? "";
+}
+
+function findSelectedContent(
+  game: Game | null,
+  selected: SelectedTarget | null
+): SelectedContent | null {
+  if (!game || !selected) {
+    return null;
+  }
+
+  const round = game.rounds.find((candidate) => candidate.id === selected.roundId);
+  if (!round) {
+    return null;
+  }
+
+  if (selected.kind === "question" && round.type === "question") {
+    const item = questionItems(round).find((candidate) => candidate.id === selected.itemId);
+    return item ? { kind: "question", round, item, points: item.points } : null;
+  }
+
+  if (selected.kind === "listening" && round.type === "listening") {
+    const item = listeningItems(round).find((candidate) => candidate.id === selected.itemId);
+    return item ? { kind: "listening", round, item, points: item.points ?? 0 } : null;
+  }
+
+  if (selected.kind === "common-denominator" && round.type === "common-denominator") {
+    return { kind: "common-denominator", round, points: round.points ?? 0 };
+  }
+
+  return null;
+}
+
+function AudioPlayer({ src }: { src: string }) {
+  return <audio aria-label="Přehrát audio ukázku" controls src={src} />;
+}
 
 export function PlayPage({ gameId }: PlayPageProps) {
-  const session = useGameSession(gameId);
-  const [isAnswerVisible, setIsAnswerVisible] = useState(false);
-  const selectedQuestion = useMemo(
-    () =>
-      demoGame.questions.find(
-        (question) => question.id === session.currentQuestionId
-      ),
-    [session.currentQuestionId]
-  );
-  const selectedCategory = useMemo(
-    () =>
-      selectedQuestion
-        ? demoGame.categories.find(
-            (category) => category.id === selectedQuestion.categoryId
-          )
-        : undefined,
-    [selectedQuestion]
-  );
+  const [game, setGame] = useState<Game | null>(null);
+  const [error, setError] = useState("");
+  const [selected, setSelected] = useState<SelectedTarget | null>(null);
+  const [phase, setPhase] = useState<Phase>("board");
+  const [completedIds, setCompletedIds] = useState<string[]>([]);
+  const [scores, setScores] = useState<Record<string, number>>({});
+  const [activeTeamId, setActiveTeamId] = useState("");
 
   useEffect(() => {
-    setIsAnswerVisible(false);
-  }, [session.currentQuestionId]);
+    let isMounted = true;
 
-  if (gameId !== supportedGameId) {
+    async function loadGame() {
+      try {
+        setError("");
+        const loadedGame = await gamesClient.loadGame(gameId);
+        if (!isMounted) {
+          return;
+        }
+
+        setGame(loadedGame);
+        setScores(Object.fromEntries(loadedGame.teams.map((team) => [team.id, 0])));
+        setActiveTeamId(loadedGame.teams[0]?.id ?? "");
+        setSelected(null);
+        setPhase("board");
+        setCompletedIds([]);
+      } catch {
+        if (isMounted) {
+          setError("Hru se nepodařilo načíst.");
+        }
+      }
+    }
+
+    void loadGame();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [gameId]);
+
+  useEffect(() => {
+    function handleEnter(event: KeyboardEvent) {
+      if (event.key !== "Enter" || !selected) {
+        return;
+      }
+
+      setPhase((currentPhase) => {
+        if (currentPhase === "board") {
+          return "prompt";
+        }
+
+        if (currentPhase === "prompt") {
+          return "answer";
+        }
+
+        return currentPhase;
+      });
+    }
+
+    window.addEventListener("keydown", handleEnter);
+    return () => window.removeEventListener("keydown", handleEnter);
+  }, [selected]);
+
+  const selectedContent = useMemo(
+    () => findSelectedContent(game, selected),
+    [game, selected]
+  );
+
+  function selectTarget(target: SelectedTarget) {
+    if (completedIds.includes(selectedId(target))) {
+      return;
+    }
+
+    setSelected(target);
+    setPhase("board");
+  }
+
+  function scoreSelected(direction: 1 | -1) {
+    if (!selectedContent || !activeTeamId) {
+      return;
+    }
+
+    setScores((currentScores) => ({
+      ...currentScores,
+      [activeTeamId]: (currentScores[activeTeamId] ?? 0) + selectedContent.points * direction
+    }));
+  }
+
+  function returnToBoard() {
+    if (selected) {
+      setCompletedIds((currentIds) => [...new Set([...currentIds, selectedId(selected)])]);
+    }
+
+    setSelected(null);
+    setPhase("board");
+  }
+
+  if (error) {
     return (
-      <section
-        className="page-panel page-panel-wide play-page"
-        aria-labelledby="play-title"
-      >
-        <p className="eyebrow">Demo hra</p>
+      <section className="page-panel page-panel-wide play-page" aria-labelledby="play-title">
         <h1 id="play-title">Hra nenalezena</h1>
-        <p className="page-copy">Hra "{gameId}" zatím není dostupná.</p>
+        <p className="page-copy">{error}</p>
       </section>
     );
   }
 
-  const completeQuestion = () => {
-    session.markQuestionUsed();
-    session.clearCurrentQuestion();
-  };
-
-  if (selectedQuestion && selectedCategory) {
+  if (!game) {
     return (
-      <section
-        className="page-panel page-panel-wide play-page question-page"
-        aria-labelledby="play-title"
-      >
-        <p className="eyebrow">Otázka</p>
-        <h1 id="play-title">
-          {selectedCategory.title} za {selectedQuestion.points} bodů
-        </h1>
-        <article className="question-card">
-          <p className="question-prompt">{selectedQuestion.prompt}</p>
-          {selectedQuestion.audio ? (
-            <div className="question-audio" aria-label="Hudební ukázka">
-              <strong>{selectedQuestion.audio.title}</strong>
-              {selectedQuestion.audio.durationSeconds ? (
-                <span>{selectedQuestion.audio.durationSeconds} s</span>
-              ) : null}
-            </div>
-          ) : null}
-          {isAnswerVisible ? (
-            <div className="answer-panel">
-              <p className="answer-label">Odpověď</p>
-              <p className="answer-text">{selectedQuestion.answer}</p>
-              {selectedQuestion.moderatorNote ? (
-                <p className="moderator-note">{selectedQuestion.moderatorNote}</p>
-              ) : null}
-            </div>
-          ) : null}
-        </article>
-        <div className="question-actions">
-          <button
-            className="button-secondary"
-            type="button"
-            onClick={session.clearCurrentQuestion}
-          >
-            Zpět na tabuli
-          </button>
-          {!isAnswerVisible ? (
-            <button
-              className="button-primary"
-              type="button"
-              onClick={() => setIsAnswerVisible(true)}
-            >
-              Zobrazit odpověď
-            </button>
-          ) : null}
-          <button className="button-primary" type="button" onClick={completeQuestion}>
-            Správně
-          </button>
-          <button className="button-secondary" type="button" onClick={completeQuestion}>
-            Špatně
-          </button>
-        </div>
+      <section className="page-panel page-panel-wide play-page" aria-labelledby="play-title">
+        <h1 id="play-title">Načítám hru</h1>
       </section>
     );
   }
 
   return (
-    <section
-      className="page-panel page-panel-wide play-page"
-      aria-labelledby="play-title"
-    >
-      <p className="eyebrow">Demo hra</p>
-      <h1 id="play-title">Herní tabule</h1>
-      <p className="game-code">Kód hry: {gameId}</p>
-      <p className="page-copy">
-        Vyberte políčko s bodovou hodnotou. Použitá políčka zůstanou na tabuli
-        viditelná a ztlumená.
-      </p>
-      <div className="presenter-toolbar" aria-label="Ovládání tabule">
-        <button
-          className="button-secondary"
-          type="button"
-          onClick={session.resetSession}
-        >
-          Resetovat tabuli
-        </button>
+    <section className="presenter-shell" aria-labelledby="play-title">
+      <header className="presenter-header">
+        <h1 id="play-title">{game.title}</h1>
+        <section className="scoreboard" aria-label="Skóre týmů" role="region">
+          {game.teams.map((team) => (
+            <div key={team.id} className="scoreboard-team">
+              <span>{team.name}</span>
+              <strong>{scores[team.id] ?? 0}</strong>
+            </div>
+          ))}
+        </section>
+      </header>
+
+      <div className="presenter-board">
+        {game.rounds.map((round) => {
+          if (round.type === "question") {
+            return (
+              <section className="round-section" key={round.id}>
+                <h2>{round.title}</h2>
+                <div className="question-grid">
+                  {round.categories.map((category) => (
+                    <div key={category.id} className="question-column">
+                      <h3>{category.title}</h3>
+                      {questionItems(round)
+                        .filter((item) => item.categoryId === category.id)
+                        .map((item) => {
+                          const target: SelectedTarget = {
+                            kind: "question",
+                            roundId: round.id,
+                            itemId: item.id
+                          };
+                          const id = selectedId(target);
+                          const isCompleted = completedIds.includes(id);
+                          return (
+                            <button
+                              aria-disabled={isCompleted}
+                              className="tile-button"
+                              disabled={isCompleted}
+                              key={item.id}
+                              onClick={() => selectTarget(target)}
+                              type="button"
+                            >
+                              {category.title} za {item.points}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            );
+          }
+
+          if (round.type === "listening") {
+            return (
+              <section className="round-section" key={round.id}>
+                <h2>{round.title}</h2>
+                <div className="question-grid">
+                  {listeningItems(round).map((item) => {
+                    const target: SelectedTarget = {
+                      kind: "listening",
+                      roundId: round.id,
+                      itemId: item.id
+                    };
+                    const id = selectedId(target);
+                    const isCompleted = completedIds.includes(id);
+                    return (
+                      <button
+                        aria-disabled={isCompleted}
+                        className="tile-button"
+                        disabled={isCompleted}
+                        key={item.id}
+                        onClick={() => selectTarget(target)}
+                        type="button"
+                      >
+                        Poslech za {item.points ?? 0}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          }
+
+          const target: SelectedTarget = { kind: "common-denominator", roundId: round.id };
+          const isCompleted = completedIds.includes(selectedId(target));
+
+          return (
+            <section className="round-section" key={round.id}>
+              <h2>{round.title}</h2>
+              <button
+                aria-disabled={isCompleted}
+                className="tile-button"
+                disabled={isCompleted}
+                onClick={() => selectTarget(target)}
+                type="button"
+              >
+                Společný jmenovatel za {round.points ?? 0}
+              </button>
+            </section>
+          );
+        })}
       </div>
-      <GameBoard
-        game={demoGame}
-        currentQuestionId={session.currentQuestionId}
-        revealedQuestionIds={session.revealedQuestionIds}
-        onSelectQuestion={session.selectTile}
-      />
+
+      {selectedContent && phase !== "board" && (
+        <section className="presenter-panel" aria-label="Vybraná položka">
+          {selectedContent.kind === "question" && (
+            <>
+              <h2>Otázka za {selectedContent.item.points}</h2>
+              <p>{selectedContent.item.prompt}</p>
+              {selectedContent.item.audio ? (
+                <AudioPlayer src={selectedContent.item.audio.src} />
+              ) : null}
+              {phase === "answer" ? (
+                <div className="answer-panel">
+                  <h3>Odpověď</h3>
+                  <p>{selectedContent.item.answer}</p>
+                  {selectedContent.item.moderatorNote ? (
+                    <p>{selectedContent.item.moderatorNote}</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          )}
+
+          {selectedContent.kind === "listening" && (
+            <>
+              <h2>Poslech za {selectedContent.item.points ?? 0}</h2>
+              <p>{selectedContent.item.prompt}</p>
+              {selectedContent.item.audio ? (
+                <AudioPlayer src={selectedContent.item.audio.src} />
+              ) : null}
+              {phase === "answer" ? (
+                <div className="answer-panel">
+                  <h3>Odpověď</h3>
+                  <p>Název: {listeningAnswerTitle(selectedContent.item)}</p>
+                  {listeningAnswerArtist(selectedContent.item) ? (
+                    <p>Interpret: {listeningAnswerArtist(selectedContent.item)}</p>
+                  ) : null}
+                  {selectedContent.item.moderatorNote ? (
+                    <p>{selectedContent.item.moderatorNote}</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          )}
+
+          {selectedContent.kind === "common-denominator" && (
+            <>
+              <h2>{selectedContent.round.title}</h2>
+              <ol className="clue-list">
+                {selectedContent.round.clues.map((clue, index) => (
+                  <li key={clue.id}>
+                    <strong>Nápověda {index + 1}</strong>
+                    <span>{clue.prompt ?? clue.text}</span>
+                    {clue.audio ? <AudioPlayer src={clue.audio.src} /> : null}
+                  </li>
+                ))}
+              </ol>
+              {phase === "answer" ? (
+                <div className="answer-panel">
+                  <h3>Finální odpověď</h3>
+                  <p>{selectedContent.round.answer}</p>
+                  {selectedContent.round.moderatorNote ? (
+                    <p>{selectedContent.round.moderatorNote}</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          )}
+
+          {phase === "answer" ? (
+            <div className="scoring-controls">
+              <label>
+                <span>Bodovaný tým</span>
+                <select
+                  value={activeTeamId}
+                  onChange={(event) => setActiveTeamId(event.target.value)}
+                >
+                  {game.teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button type="button" onClick={() => scoreSelected(1)}>
+                Správně
+              </button>
+              <button type="button" onClick={() => scoreSelected(-1)}>
+                Špatně
+              </button>
+              <button type="button" onClick={returnToBoard}>
+                Zpět na tabuli
+              </button>
+            </div>
+          ) : null}
+        </section>
+      )}
     </section>
   );
 }
+
+export default PlayPage;
