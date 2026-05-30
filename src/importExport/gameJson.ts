@@ -54,7 +54,7 @@ export function parseGameJson(text: string): Game {
   assertRecord(value.game, "game");
   validateGame(value.game, "game");
 
-  return value.game as Game;
+  return value.game as unknown as Game;
 }
 
 function validateGame(value: Record<string, unknown>, path: string) {
@@ -140,7 +140,7 @@ function validateQuestions(questions: unknown[], path: string) {
     assertNumber(question.points, `${questionPath}.points`);
     assertString(question.prompt, `${questionPath}.prompt`);
     assertString(question.answer, `${questionPath}.answer`);
-    validateOptionalAudio(question as Question, `${questionPath}.audio`);
+    validateOptionalAudio(question as unknown as Question, `${questionPath}.audio`);
   });
 }
 
@@ -153,7 +153,7 @@ function validateListeningItems(items: unknown[], path: string) {
     assertString(item.id, `${itemPath}.id`);
     assertString(item.prompt, `${itemPath}.prompt`);
     assertString(item.answer, `${itemPath}.answer`);
-    validateOptionalAudio(item as ListeningItem, `${itemPath}.audio`);
+    validateOptionalAudio(item as unknown as ListeningItem, `${itemPath}.audio`);
   });
 }
 
@@ -170,7 +170,7 @@ function validateCommonClues(clues: unknown[], path: string) {
     if (clue.text !== undefined) {
       assertString(clue.text, `${cluePath}.text`);
     }
-    validateOptionalAudio(clue as CommonDenominatorClue, `${cluePath}.audio`);
+    validateOptionalAudio(clue as unknown as CommonDenominatorClue, `${cluePath}.audio`);
   });
 }
 
