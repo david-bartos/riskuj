@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import GameEditor, { normalizeGame, prepareGameForSave } from "./GameEditor";
 import type { Game } from "../../types/game";
 import { riskuj20260606Game } from "../../data/riskuj-2026-06-06";
+import { validateGame as validateServerGame } from "../../../server/gameValidation";
 
 const gameFixture: Game = {
   id: "test-game",
@@ -39,6 +40,51 @@ const gameFixture: Game = {
 };
 
 describe("GameEditor", () => {
+  it("umožní z prázdné hry přidat a uložit všechna tři kola", () => {
+    const onSave = vi.fn();
+    const emptyGame: Game = {
+      id: "empty-game",
+      title: "Prázdná hra",
+      teams: [{ id: "team-a", name: "Tým A" }],
+      rounds: []
+    };
+
+    render(<GameEditor initialGame={emptyGame} onSave={onSave} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Přidat kolo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Přidat kolo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Přidat kolo" }));
+
+    expect(screen.getAllByLabelText("Typ kola")).toHaveLength(3);
+
+    fireEvent.click(screen.getByRole("button", { name: "Přidat poslechový track" }));
+    fireEvent.change(screen.getByLabelText("Žánr / sloupec"), { target: { value: "Pop" } });
+    fireEvent.change(screen.getByLabelText("Interpret"), { target: { value: "Ewa Farna" } });
+    fireEvent.change(screen.getByLabelText("Název skladby"), {
+      target: { value: "Měls mě vůbec rád" }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Přidat položku" }));
+    fireEvent.change(screen.getByLabelText("Clues"), {
+      target: { value: "Queen\nABBA\nAqua" }
+    });
+    fireEvent.change(screen.getByLabelText("Správná odpověď"), {
+      target: { value: "Krátké názvy kapel" }
+    });
+    fireEvent.change(screen.getByLabelText("Vysvětlení pro moderátora"), {
+      target: { value: "Všechny clues jsou jednoslovné kapely." }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Uložit hru" }));
+
+    const savedGame = onSave.mock.calls[0][0] as Game;
+    expect(savedGame.rounds.map((round) => round.type)).toEqual([
+      "question",
+      "listening",
+      "common-denominator"
+    ]);
+  });
+
   it("vytvoří poslechový track s audio assetem z prázdné hry", async () => {
     const onSave = vi.fn();
     const emptyGame: Game = {
@@ -272,6 +318,62 @@ describe("GameEditor", () => {
 
     expect(listeningRound?.tracks[0].audio).toEqual(audio);
     expect(listeningRound?.tracks[0].audioUrl).toBe("/uploads/track.mp3");
+    expect(listeningRound?.items?.[0]).toMatchObject({
+      title: "Song",
+      trackTitleAnswer: "Song",
+      artistAnswer: "Artist",
+      audio: { src: "/uploads/track.mp3" },
+      audioUrl: "/uploads/track.mp3"
+    });
+  });
+
+  it("doplní poslechovému tracku prompt a answer pro backend validaci", () => {
+    const audio = { id: "audio-track", src: "/uploads/track.mp3", title: "Track" };
+    const savedGame = prepareGameForSave(
+      normalizeGame({
+        id: "empty-game",
+        title: "Prázdná hra",
+        teams: [],
+        rounds: [
+          {
+            id: "round-poslech",
+            type: "listening",
+            title: "Poslechové kolo",
+            categories: [{ id: "genre-1", title: "Pop" }],
+            tracks: []
+          }
+        ],
+        listeningGenres: [{ id: "genre-1", title: "Pop" }],
+        listeningItems: [
+          {
+            id: "listen-1",
+            genreId: "genre-1",
+            categoryId: "genre-1",
+            artist: "Ewa Farna",
+            title: "Měls mě vůbec rád",
+            prompt: "",
+            answer: "",
+            audio
+          }
+        ]
+      })
+    );
+
+    const listeningRound = savedGame.rounds.find((round) => round.type === "listening");
+
+    expect(listeningRound?.type).toBe("listening");
+    if (listeningRound?.type !== "listening") {
+      throw new Error("Missing listening round");
+    }
+    expect(listeningRound.tracks[0]).toMatchObject({
+      prompt: "Poznej interpreta a název skladby.",
+      answer: "Ewa Farna - Měls mě vůbec rád"
+    });
+    expect(listeningRound.items?.[0]).toMatchObject({
+      prompt: "Poznej interpreta a název skladby.",
+      answer: "Ewa Farna - Měls mě vůbec rád"
+    });
+    expect(validateServerGame(savedGame)).toEqual([]);
   });
 
   it("uloží audio indicie do třetího kola v canonical rounds", () => {
