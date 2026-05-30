@@ -243,12 +243,98 @@ export const demoGame: Game = {
       title: "Riskuj",
       categories,
       questions
+    },
+    {
+      id: "round-poslech",
+      type: "listening",
+      title: "Poslechové kolo",
+      categories: [
+        { id: "filmove-duety", title: "Filmové duety" },
+        { id: "cover-verze", title: "Cover verze" }
+      ],
+      tracks: [
+        {
+          id: "poslech-1",
+          categoryId: "filmove-duety",
+          genreId: "filmove-duety",
+          points: questionPoints[0],
+          title: "Shallow",
+          artist: "Lady Gaga a Bradley Cooper",
+          prompt: "Poznejte píseň a film podle ukázky.",
+          answer: "Shallow ze Zrodila se hvězda",
+          audioUrl: demoAudioSrc,
+          audio: {
+            id: "audio-poslech-1",
+            src: demoAudioSrc,
+            title: "Shallow"
+          }
+        },
+        {
+          id: "poslech-2",
+          categoryId: "cover-verze",
+          genreId: "cover-verze",
+          points: questionPoints[1],
+          title: "Hallelujah",
+          artist: "Jeff Buckley",
+          prompt: "Poznejte cover verzi podle ukázky.",
+          answer: "Hallelujah",
+          audioUrl: demoAudioSrc,
+          audio: {
+            id: "audio-poslech-2",
+            src: demoAudioSrc,
+            title: "Hallelujah"
+          }
+        }
+      ]
+    },
+    {
+      id: "round-spolecny-jmenovatel",
+      type: "common-denominator",
+      title: "Společný jmenovatel",
+      answer: "Queen",
+      clues: [
+        { id: "queen-clue-1", order: 1, prompt: "Bohemian Rhapsody", text: "Bohemian Rhapsody" },
+        { id: "queen-clue-2", order: 2, prompt: "Freddie Mercury", text: "Freddie Mercury" },
+        { id: "queen-clue-3", order: 3, prompt: "We Will Rock You", text: "We Will Rock You" }
+      ]
     }
   ],
   createdAt: demoTimestamp,
   updatedAt: demoTimestamp,
   categories,
-  questions
+  questions,
+  listeningGenres: [
+    { id: "filmove-duety", title: "Filmové duety" },
+    { id: "cover-verze", title: "Cover verze" }
+  ],
+  listeningItems: [
+    {
+      id: "poslech-1",
+      genreId: "filmove-duety",
+      title: "Shallow",
+      artist: "Lady Gaga a Bradley Cooper",
+      prompt: "Poznejte píseň a film podle ukázky.",
+      answer: "Shallow ze Zrodila se hvězda",
+      audioUrl: demoAudioSrc
+    },
+    {
+      id: "poslech-2",
+      genreId: "cover-verze",
+      title: "Hallelujah",
+      artist: "Jeff Buckley",
+      prompt: "Poznejte cover verzi podle ukázky.",
+      answer: "Hallelujah",
+      audioUrl: demoAudioSrc
+    }
+  ],
+  commonDenominator: {
+    answer: "Queen",
+    clues: [
+      { id: "queen-clue-1", text: "Bohemian Rhapsody" },
+      { id: "queen-clue-2", text: "Freddie Mercury" },
+      { id: "queen-clue-3", text: "We Will Rock You" }
+    ]
+  }
 };
 
 export { questionPoints as demoQuestionPoints };

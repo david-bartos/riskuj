@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { demoGame } from "../data/demoGame";
 import type { Game } from "../types/game";
-import { GamesClientError, createGame, listGames, loadGame, saveGame } from "./gamesClient";
+import { GamesClientError, createGame, gamesClient, listGames, loadGame, saveGame } from "./gamesClient";
 
 const game: Game = {
   id: "test-game",
@@ -99,12 +100,21 @@ describe("gamesClient", () => {
     });
   });
 
-  it("použije český fallback při výpadku sítě", async () => {
+  it("při výpadku sítě vrátí lokální seznam demo her", async () => {
     const fetchMock = vi.fn().mockRejectedValue(new TypeError("Network failed"));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(listGames()).rejects.toMatchObject({
-      message: "Nepodařilo se spojit se serverem."
+    await expect(listGames()).resolves.toEqual([
+      expect.objectContaining({ id: demoGame.id, title: demoGame.title })
+    ]);
+  });
+
+  it("při nedostupném API načte demo hru z lokální zálohy", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+
+    await expect(gamesClient.loadGame(demoGame.id)).resolves.toMatchObject({
+      id: demoGame.id,
+      title: demoGame.title
     });
   });
 });

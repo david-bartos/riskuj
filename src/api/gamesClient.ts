@@ -1,4 +1,6 @@
 import type { Game, GameSummary } from "../types/game";
+export type { GameSummary } from "../types/game";
+import { demoGame } from "../data/demoGame";
 
 export class GamesClientError extends Error {
   constructor(
@@ -11,15 +13,37 @@ export class GamesClientError extends Error {
   }
 }
 
-export function listGames(): Promise<GameSummary[]> {
-  return requestJson<GameSummary[]>("/api/games");
+const localGames = new Map<string, Game>([[demoGame.id, demoGame]]);
+
+export async function listGames(): Promise<GameSummary[]> {
+  try {
+    return await requestJson<GameSummary[]>("/api/games");
+  } catch {
+    return Array.from(localGames.values()).map((game) => ({
+      id: game.id,
+      title: game.title,
+      updatedAt: game.updatedAt,
+      roundCount: game.rounds.length,
+    }));
+  }
 }
 
-export function loadGame(id: string): Promise<Game> {
-  return requestJson<Game>(`/api/games/${encodeURIComponent(id)}`);
+export async function loadGame(id: string): Promise<Game> {
+  try {
+    return await requestJson<Game>(`/api/games/${encodeURIComponent(id)}`);
+  } catch (error) {
+    const game = localGames.get(id);
+    if (game) {
+      return cloneGame(game);
+    }
+    if (error instanceof GamesClientError) {
+      throw error;
+    }
+    throw wrapFallbackError("Hru se nepodařilo načíst", error);
+  }
 }
 
-export function createGame(input: { title?: string } | Game = {}): Promise<Game> {
+export async function createGame(input: { title?: string } | Game = {}): Promise<Game> {
   return requestJson<Game>("/api/games", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -27,13 +51,28 @@ export function createGame(input: { title?: string } | Game = {}): Promise<Game>
   });
 }
 
-export function saveGame(game: Game): Promise<Game> {
-  return requestJson<Game>(`/api/games/${encodeURIComponent(game.id)}`, {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(game)
-  });
+export async function saveGame(game: Game): Promise<Game> {
+  try {
+    return await requestJson<Game>(`/api/games/${encodeURIComponent(game.id)}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(game)
+    });
+  } catch (error) {
+    if (error instanceof GamesClientError && error.status !== undefined) {
+      throw error;
+    }
+    localGames.set(game.id, cloneGame(game));
+    return cloneGame(game);
+  }
 }
+
+export const gamesClient = {
+  listGames,
+  loadGame,
+  createGame,
+  saveGame,
+};
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   let response: Response;
@@ -90,4 +129,13 @@ function readDetails(body: { details?: unknown }) {
   }
 
   return body.details.filter((detail): detail is string => typeof detail === "string");
+}
+
+function cloneGame(game: Game): Game {
+  return structuredClone(game);
+}
+
+function wrapFallbackError(action: string, error: unknown): Error {
+  const detail = error instanceof Error ? error.message : "neznámá chyba";
+  return new Error(`${action}: ${detail}`);
 }

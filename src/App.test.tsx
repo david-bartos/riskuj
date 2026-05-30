@@ -24,7 +24,7 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
-  it("zobrazí placeholder editoru na /admin", () => {
+  it("zobrazí editor hry na /admin", async () => {
     window.history.pushState({}, "", "/admin");
 
     render(<App />);
@@ -32,9 +32,9 @@ describe("App", () => {
     expect(
       screen.getByRole("heading", { name: "Editor hry" })
     ).toBeInTheDocument();
-    expect(
-      screen.getByText("Zde vznikne administrační editor kol, kategorií a hudebních ukázek.")
-    ).toBeInTheDocument();
+    expect(screen.getByText("Upravte otázky, poslechové ukázky a třetí kolo.")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Editor hry")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Uložit hru" })).toBeInTheDocument();
   });
 
   it("zobrazí herní tabuli na /play/demo", () => {

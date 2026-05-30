@@ -8,6 +8,8 @@ export interface AudioAsset {
   title: string;
   artist?: string;
   durationSeconds?: number;
+  /** Legacy/admin upload URL alias. */
+  url?: string;
 }
 
 export interface Team {
@@ -21,6 +23,8 @@ export interface QuestionCategory {
   title: string;
 }
 
+export type Category = QuestionCategory;
+
 export interface QuestionItem {
   id: string;
   categoryId: string;
@@ -31,7 +35,6 @@ export interface QuestionItem {
   audio?: AudioAsset;
 }
 
-export type Category = QuestionCategory;
 export type Question = QuestionItem;
 
 export interface ListeningCategory {
@@ -39,22 +42,31 @@ export interface ListeningCategory {
   title: string;
 }
 
+export type ListeningGenre = ListeningCategory;
+
 export interface ListeningItem {
   id: string;
-  categoryId: string;
-  points: QuestionPoints;
   prompt: string;
   answer: string;
+  categoryId?: string;
+  points?: QuestionPoints;
   audio?: AudioAsset;
   moderatorNote?: string;
+  /** Admin editor compatibility fields. */
+  genreId?: string;
+  title?: string;
+  artist?: string;
+  audioUrl?: string;
 }
 
 export interface CommonDenominatorClue {
   id: string;
-  order: number;
-  prompt: string;
+  order?: number;
+  prompt?: string;
   answer?: string;
   audio?: AudioAsset;
+  /** Admin editor compatibility field. */
+  text?: string;
 }
 
 export interface BaseRound {
@@ -90,8 +102,17 @@ export interface Game {
   rounds: GameRound[];
   createdAt: string;
   updatedAt: string;
+  /** Legacy projection used by the current presenter/admin UI until it is fully migrated to rounds. */
   categories: Category[];
+  /** Legacy projection used by the current presenter/admin UI until it is fully migrated to rounds. */
   questions: Question[];
+  /** Admin editor compatibility fields for 2./3. kolo. */
+  listeningGenres?: ListeningGenre[];
+  listeningItems?: ListeningItem[];
+  commonDenominator?: {
+    answer: string;
+    clues: CommonDenominatorClue[];
+  };
 }
 
 export interface GameSummary {
