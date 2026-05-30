@@ -38,6 +38,22 @@ const gameFixture: Game = {
 };
 
 describe("GameEditor", () => {
+  it("před startem umožní upravit šest názvů týmů a uloží je", () => {
+    const onSave = vi.fn();
+    render(<GameEditor initialGame={gameFixture} onSave={onSave} />);
+
+    expect(screen.getAllByLabelText(/Název týmu/i)).toHaveLength(6);
+
+    fireEvent.change(screen.getByDisplayValue("Tým 1"), {
+      target: { value: "Hospoda Sever" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Uložit hru" }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0][0].teams[0].name).toBe("Hospoda Sever");
+    expect(onSave.mock.calls[0][0].teams).toHaveLength(6);
+  });
+
   it("umožní změnit text otázky prvního kola", () => {
     render(<GameEditor initialGame={gameFixture} onSave={vi.fn()} />);
 
