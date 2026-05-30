@@ -34,7 +34,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.get(
     "/api/games/:id",
     asyncHandler(async (request, response) => {
-      const id = request.params.id;
+      const id = readRouteId(request.params.id);
 
       if (!isSafeGameId(id)) {
         response.status(400).json({ message: "Neplatné ID hry." });
@@ -69,7 +69,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.put(
     "/api/games/:id",
     asyncHandler(async (request, response) => {
-      const id = request.params.id;
+      const id = readRouteId(request.params.id);
 
       if (!isSafeGameId(id)) {
         response.status(400).json({ message: "Neplatné ID hry." });
@@ -125,6 +125,10 @@ function readOptionalTitle(value: unknown) {
   }
 
   return value.title;
+}
+
+function readRouteId(value: string | string[] | undefined) {
+  return typeof value === "string" ? value : "";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
