@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import GameEditor, { normalizeGame, prepareGameForSave } from "./GameEditor";
 import type { Game } from "../../types/game";
 import { riskuj20260606Game } from "../../data/riskuj-2026-06-06";
+import { validateGame as validateServerGame } from "../../../server/gameValidation";
 
 const gameFixture: Game = {
   id: "test-game",
@@ -324,6 +325,55 @@ describe("GameEditor", () => {
       audio: { src: "/uploads/track.mp3" },
       audioUrl: "/uploads/track.mp3"
     });
+  });
+
+  it("doplní poslechovému tracku prompt a answer pro backend validaci", () => {
+    const audio = { id: "audio-track", src: "/uploads/track.mp3", title: "Track" };
+    const savedGame = prepareGameForSave(
+      normalizeGame({
+        id: "empty-game",
+        title: "Prázdná hra",
+        teams: [],
+        rounds: [
+          {
+            id: "round-poslech",
+            type: "listening",
+            title: "Poslechové kolo",
+            categories: [{ id: "genre-1", title: "Pop" }],
+            tracks: []
+          }
+        ],
+        listeningGenres: [{ id: "genre-1", title: "Pop" }],
+        listeningItems: [
+          {
+            id: "listen-1",
+            genreId: "genre-1",
+            categoryId: "genre-1",
+            artist: "Ewa Farna",
+            title: "Měls mě vůbec rád",
+            prompt: "",
+            answer: "",
+            audio
+          }
+        ]
+      })
+    );
+
+    const listeningRound = savedGame.rounds.find((round) => round.type === "listening");
+
+    expect(listeningRound?.type).toBe("listening");
+    if (listeningRound?.type !== "listening") {
+      throw new Error("Missing listening round");
+    }
+    expect(listeningRound.tracks[0]).toMatchObject({
+      prompt: "Poznej interpreta a název skladby.",
+      answer: "Ewa Farna - Měls mě vůbec rád"
+    });
+    expect(listeningRound.items?.[0]).toMatchObject({
+      prompt: "Poznej interpreta a název skladby.",
+      answer: "Ewa Farna - Měls mě vůbec rád"
+    });
+    expect(validateServerGame(savedGame)).toEqual([]);
   });
 
   it("uloží audio indicie do třetího kola v canonical rounds", () => {

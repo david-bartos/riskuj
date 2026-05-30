@@ -817,16 +817,24 @@ export default function GameEditor({
 export { GameEditor };
 
 function normalizeListeningItems(game: EditableGame): ListeningItem[] {
-  return game.listeningItems.map((item) => ({
-    ...item,
-    categoryId: item.categoryId ?? item.genreId ?? game.listeningGenres[0]?.id ?? "",
-    genreId: item.genreId ?? item.categoryId,
-    points: item.points ?? 100,
-    trackTitleAnswer: item.trackTitleAnswer ?? item.title ?? item.trackTitle ?? item.answer,
-    artistAnswer: item.artistAnswer ?? item.artist ?? "",
-    audioUrl: item.audio?.src ?? item.audioUrl,
-    scoring: { artist: 1000, title: 3000, both: 5000 }
-  }));
+  return game.listeningItems.map((item) => {
+    const artist = item.artistAnswer ?? item.artist ?? "";
+    const trackTitle = item.trackTitleAnswer ?? item.title ?? item.trackTitle ?? item.answer;
+    const answer = item.answer.trim() || [artist, trackTitle].filter(Boolean).join(" - ");
+
+    return {
+      ...item,
+      categoryId: item.categoryId ?? item.genreId ?? game.listeningGenres[0]?.id ?? "",
+      genreId: item.genreId ?? item.categoryId,
+      points: item.points ?? 100,
+      prompt: item.prompt.trim() || "Poznej interpreta a název skladby.",
+      answer,
+      trackTitleAnswer: trackTitle,
+      artistAnswer: artist,
+      audioUrl: item.audio?.src ?? item.audioUrl,
+      scoring: { artist: 1000, title: 3000, both: 5000 }
+    };
+  });
 }
 
 function createRoundShell(type: RoundType, game: EditableGame, id: string): Game["rounds"][number] {
