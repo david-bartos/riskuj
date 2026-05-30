@@ -20,7 +20,13 @@ function makeId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function normalizeGame(game: Game): Game {
+type EditableGame = Game & {
+  listeningGenres: ListeningGenre[];
+  listeningItems: ListeningItem[];
+  commonDenominator: NonNullable<Game["commonDenominator"]>;
+};
+
+export function normalizeGame(game: Game): EditableGame {
   return {
     ...game,
     listeningGenres: game.listeningGenres ?? [],
@@ -33,9 +39,15 @@ export function createEmptyGame(): Game {
   const firstCategoryId = makeId("category");
   const firstGenreId = makeId("genre");
 
+  const now = new Date().toISOString();
+
   return {
     id: makeId("game"),
     title: "Nová hra",
+    teams: [],
+    rounds: [],
+    createdAt: now,
+    updatedAt: now,
     categories: [{ id: firstCategoryId, title: "Nová kategorie" }],
     questions: questionPoints.map((points) => ({
       id: makeId("question"),
@@ -53,7 +65,7 @@ export function createEmptyGame(): Game {
   };
 }
 
-export function validateGame(game: Game): string[] {
+export function validateGame(game: EditableGame): string[] {
   const messages: string[] = [];
 
   if (!game.title.trim()) {
@@ -74,7 +86,7 @@ export function validateGame(game: Game): string[] {
   if (!game.commonDenominator.answer.trim()) {
     messages.push("Třetí kolo musí mít vyplněný společný jmenovatel.");
   }
-  if (game.commonDenominator.clues.some((clue) => !clue.text.trim())) {
+  if (game.commonDenominator.clues.some((clue) => !(clue.text ?? "").trim())) {
     messages.push("Indicie ve třetím kole nesmí být prázdná.");
   }
 

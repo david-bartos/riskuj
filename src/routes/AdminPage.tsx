@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { gamesClient, type GameSummary } from "../api/gamesClient";
 import GameEditor, { createEmptyGame } from "../components/admin/GameEditor";
 import type { Game } from "../types/game";
 
-export default function AdminPage() {
+export function AdminPage() {
   const [games, setGames] = useState<GameSummary[]>([]);
   const [selectedGameId, setSelectedGameId] = useState("");
   const [game, setGame] = useState<Game | null>(null);
@@ -11,15 +11,17 @@ export default function AdminPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const loadRequestId = useRef(0);
 
   useEffect(() => {
     let isMounted = true;
+    const requestId = ++loadRequestId.current;
 
     async function loadInitialGame() {
       try {
         setIsLoading(true);
         const summaries = await gamesClient.listGames();
-        if (!isMounted) {
+        if (!isMounted || requestId !== loadRequestId.current) {
           return;
         }
 
@@ -27,7 +29,7 @@ export default function AdminPage() {
         const firstGame = summaries[0];
         if (firstGame) {
           const loadedGame = await gamesClient.loadGame(firstGame.id);
-          if (!isMounted) {
+          if (!isMounted || requestId !== loadRequestId.current) {
             return;
           }
           setSelectedGameId(firstGame.id);
@@ -36,14 +38,14 @@ export default function AdminPage() {
           setGame(createEmptyGame());
         }
       } catch (loadError) {
-        if (!isMounted) {
+        if (!isMounted || requestId !== loadRequestId.current) {
           return;
         }
         const detail = loadError instanceof Error ? loadError.message : "neznámá chyba";
         setError(`Hry se nepodařilo načíst. ${detail}`);
         setGame(createEmptyGame());
       } finally {
-        if (isMounted) {
+        if (isMounted && requestId === loadRequestId.current) {
           setIsLoading(false);
         }
       }
@@ -57,27 +59,38 @@ export default function AdminPage() {
   }, []);
 
   async function handleSelectGame(gameId: string) {
+    const requestId = ++loadRequestId.current;
     setSelectedGameId(gameId);
     setStatus(null);
     setError(null);
 
     if (!gameId) {
+      setIsLoading(false);
       return;
     }
 
     try {
       setIsLoading(true);
-      setGame(await gamesClient.loadGame(gameId));
+      const loadedGame = await gamesClient.loadGame(gameId);
+      if (requestId === loadRequestId.current) {
+        setGame(loadedGame);
+      }
     } catch (loadError) {
-      const detail = loadError instanceof Error ? loadError.message : "neznámá chyba";
-      setError(`Hru se nepodařilo načíst. ${detail}`);
+      if (requestId === loadRequestId.current) {
+        const detail = loadError instanceof Error ? loadError.message : "neznámá chyba";
+        setError(`Hru se nepodařilo načíst. ${detail}`);
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === loadRequestId.current) {
+        setIsLoading(false);
+      }
     }
   }
 
   function handleCreateNewGame() {
+    loadRequestId.current += 1;
     setSelectedGameId("");
+    setIsLoading(false);
     setError(null);
     setStatus("Nová hra je připravená k úpravám.");
     setGame(createEmptyGame());
@@ -93,7 +106,12 @@ export default function AdminPage() {
       setGame(savedGame);
       setSelectedGameId(savedGame.id);
       setGames((currentGames) => {
-        const summary = { id: savedGame.id, title: savedGame.title };
+        const summary = {
+          id: savedGame.id,
+          title: savedGame.title,
+          updatedAt: savedGame.updatedAt,
+          roundCount: savedGame.rounds.length,
+        };
         const existingIndex = currentGames.findIndex((current) => current.id === savedGame.id);
         if (existingIndex === -1) {
           return [...currentGames, summary];
@@ -152,3 +170,5 @@ export default function AdminPage() {
     </main>
   );
 }
+
+export default AdminPage;

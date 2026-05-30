@@ -1,9 +1,6 @@
-import type {
-  CommonDenominatorRound,
-  ListeningGenre,
-  ListeningItem,
-  Question
-} from "../../types/game";
+import type { Game, ListeningGenre, ListeningItem, Question } from "../../types/game";
+
+type AdminCommonDenominatorRound = NonNullable<Game["commonDenominator"]>;
 
 type FirstRoundQuestionEditorProps = {
   question: Question;
@@ -126,8 +123,8 @@ export function ListeningItemEditor({
 }
 
 type CommonDenominatorEditorProps = {
-  round: CommonDenominatorRound;
-  onChange: (round: CommonDenominatorRound) => void;
+  round: AdminCommonDenominatorRound;
+  onChange: (round: AdminCommonDenominatorRound) => void;
   onAddClue: () => void;
   onRemoveClue: (clueId: string) => void;
 };
@@ -152,12 +149,14 @@ export function CommonDenominatorEditor({
           <label className="field-stack">
             <span>{`Indicie ${index + 1}`}</span>
             <textarea
-              value={clue.text}
+              value={clue.text ?? clue.prompt ?? ""}
               onChange={(event) =>
                 onChange({
                   ...round,
                   clues: round.clues.map((current) =>
-                    current.id === clue.id ? { ...current, text: event.target.value } : current
+                    current.id === clue.id
+                      ? { ...current, text: event.target.value, prompt: event.target.value }
+                      : current
                   )
                 })
               }

@@ -1,4 +1,9 @@
 node_modules
 dist
-data/uploads
 .env
+
+data/uploads/*
+!data/uploads/.gitkeep
+
+data/games/*
+!data/games/.gitkeep
