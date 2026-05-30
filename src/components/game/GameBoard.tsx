@@ -40,22 +40,24 @@ export function GameBoard({
   revealedQuestionIds,
   onSelectQuestion
 }: GameBoardProps) {
+  const questions = game.questions ?? [];
+  const categories = game.categories ?? [];
   const pointRows = useMemo(
     () =>
-      Array.from(new Set(game.questions.map((question) => question.points))).sort(
+      Array.from(new Set(questions.map((question) => question.points))).sort(
         (first, second) => first - second
       ),
-    [game.questions]
+    [questions]
   );
   const questionsByCell = useMemo(
     () =>
       new Map(
-        game.questions.map((question) => [
+        questions.map((question) => [
           getQuestionKey(question.categoryId, question.points),
           question
         ])
       ),
-    [game.questions]
+    [questions]
   );
   const revealedIds = useMemo(
     () => new Set(revealedQuestionIds),
@@ -69,16 +71,16 @@ export function GameBoard({
         className="game-board"
         role="grid"
         aria-label={`Herní tabule ${game.title}`}
-        style={{ "--board-columns": game.categories.length } as CSSProperties}
+        style={{ "--board-columns": categories.length } as CSSProperties}
       >
-        {game.categories.map((category) => (
+        {categories.map((category) => (
           <div className="category-tile" role="columnheader" key={category.id}>
             {category.title}
           </div>
         ))}
 
         {pointRows.flatMap((points) =>
-          game.categories.map((category) => {
+          categories.map((category) => {
             const question = questionsByCell.get(getQuestionKey(category.id, points));
 
             return (

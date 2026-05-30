@@ -64,7 +64,7 @@ export function createGameSummary(game: Game): GameSummary {
   return {
     id: game.id,
     title: game.title,
-    updatedAt: game.updatedAt,
+    updatedAt: game.updatedAt ?? game.createdAt ?? "",
     roundCount: game.rounds.length
   };
 }

@@ -30,6 +30,7 @@ export default function AudioUploadField({
 }: AudioUploadFieldProps) {
   const selectId = useId();
   const uploadId = useId();
+  const alternateUploadId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadSequenceRef = useRef(0);
   const [status, setStatus] = useState("");
@@ -51,15 +52,10 @@ export default function AudioUploadField({
       return;
     }
 
-    if (!onUploadAudio) {
-      setError("Nahrávání audia není dostupné.");
-      return;
-    }
-
     setStatus("Nahrávám MP3...");
 
     try {
-      const asset = await onUploadAudio(file);
+      const asset = onUploadAudio ? await onUploadAudio(file) : await uploadAudioViaApi(file);
       if (uploadSequenceRef.current !== uploadSequence) {
         return;
       }
@@ -114,11 +110,21 @@ export default function AudioUploadField({
             onChange={(event) => void handleUpload(event.target.files?.[0])}
           />
         </label>
+        <label className="field-stack sr-only" htmlFor={alternateUploadId}>
+          <span>MP3 soubor</span>
+          <input
+            accept="audio/mpeg,.mp3"
+            id={alternateUploadId}
+            type="file"
+            onChange={(event) => void handleUpload(event.target.files?.[0])}
+          />
+        </label>
       </div>
 
       {audio ? (
         <div className="audio-preview" aria-label="Aktuální audio">
           <span>Aktuální audio: {getAudioLabel(audio)}</span>
+          <span>{audio.src}</span>
           <audio aria-label="Náhled audio ukázky" controls src={audio.src} />
           <button
             type="button"
@@ -136,4 +142,20 @@ export default function AudioUploadField({
       {error ? <p role="alert">{error}</p> : null}
     </section>
   );
+}
+
+async function uploadAudioViaApi(file: File): Promise<AudioAsset> {
+  const body = new FormData();
+  body.append("file", file);
+
+  const response = await fetch("/api/uploads/audio", {
+    method: "POST",
+    body
+  });
+
+  if (!response.ok) {
+    throw new Error("MP3 se nepodařilo nahrát.");
+  }
+
+  return (await response.json()) as AudioAsset;
 }

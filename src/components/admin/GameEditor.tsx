@@ -7,7 +7,8 @@ import type {
   ListeningGenre,
   ListeningItem,
   Question,
-  QuestionPoints
+  QuestionPoints,
+  RoundType
 } from "../../types/game";
 import CategoryEditor from "./CategoryEditor";
 import {
@@ -36,6 +37,8 @@ function makeId(prefix: string): string {
 }
 
 type EditableGame = Game & {
+  categories: Category[];
+  questions: Question[];
   listeningGenres: ListeningGenre[];
   listeningItems: ListeningItem[];
   commonDenominator: NonNullable<Game["commonDenominator"]>;
@@ -48,11 +51,30 @@ type AudioEditorProps = {
 };
 
 export function normalizeGame(game: Game): EditableGame {
+  const questionRound = game.rounds.find((round) => round.type === "question");
+  const listeningRound = game.rounds.find((round) => round.type === "listening");
   const commonRound = game.rounds.find((round) => round.type === "common-denominator");
+  const categories =
+    game.categories ?? (questionRound?.type === "question" ? questionRound.categories : []) ?? [];
+  const questions =
+    game.questions ??
+    (questionRound?.type === "question" ? questionRound.items ?? questionRound.questions : []) ??
+    [];
+  const listeningGenres =
+    game.listeningGenres ??
+    (listeningRound?.type === "listening"
+      ? listeningRound.genres ?? listeningRound.categories
+      : []) ??
+    [];
+  const listeningItems =
+    game.listeningItems ??
+    (listeningRound?.type === "listening" ? listeningRound.items ?? listeningRound.tracks : []) ??
+    [];
   const commonDenominatorItems =
     commonRound?.type === "common-denominator" && commonRound.items?.length
       ? commonRound.items
-      : [
+      : game.commonDenominator || commonRound
+        ? [
           {
             id: "common-denominator-1",
             title: "Společný jmenovatel 1",
@@ -61,13 +83,16 @@ export function normalizeGame(game: Game): EditableGame {
             clues: game.commonDenominator?.clues ?? commonRound?.clues ?? [],
             moderatorNote: commonRound?.moderatorNote
           }
-        ];
+        ]
+        : [];
 
   return {
     ...game,
     teams: game.teams.length > 0 ? game.teams : createDefaultTeams(),
-    listeningGenres: game.listeningGenres ?? [],
-    listeningItems: game.listeningItems ?? [],
+    categories,
+    questions,
+    listeningGenres,
+    listeningItems,
     commonDenominator: game.commonDenominator ?? { answer: "", clues: [] },
     commonDenominatorItems
   };
@@ -104,93 +129,139 @@ export function createEmptyGame(): Game {
 }
 
 export function prepareGameForSave(game: EditableGame): Game {
+  const now = new Date().toISOString();
   const questionRound = game.rounds.find((round) => round.type === "question");
   const listeningRound = game.rounds.find((round) => round.type === "listening");
   const commonRound = game.rounds.find((round) => round.type === "common-denominator");
+  const roundTypes: RoundType[] =
+    game.rounds.length > 0
+      ? game.rounds.map((round) => round.type)
+      : ["question", "listening", "common-denominator"];
+  const rounds = [];
 
-  return {
-    ...game,
-    rounds: [
-      {
-        id: questionRound?.id ?? "round-otazky",
-        type: "question",
-        title: questionRound?.title ?? "Riskuj",
-        categories: game.categories,
-        questions: game.questions,
-        items: game.questions
-      },
-      {
-        id: listeningRound?.id ?? "round-poslech",
-        type: "listening",
-        title: listeningRound?.title ?? "Poslechové kolo",
-        categories: game.listeningGenres,
-        tracks: game.listeningItems.map((item) => ({
-          ...item,
-          categoryId: item.categoryId ?? item.genreId ?? game.listeningGenres[0]?.id ?? "",
-          genreId: item.genreId ?? item.categoryId,
-          points: item.points ?? 100,
-          trackTitleAnswer: item.trackTitleAnswer ?? item.title ?? item.answer,
-          artistAnswer: item.artistAnswer ?? item.artist ?? "",
-          audioUrl: item.audio?.src ?? item.audioUrl
-        })),
-        items: game.listeningItems
-      },
-      {
-        id: commonRound?.id ?? "round-spolecny-jmenovatel",
-        type: "common-denominator",
-        title: commonRound?.title ?? "Společný jmenovatel",
-        points: commonRound?.points ?? 300,
-        answer: game.commonDenominatorItems[0]?.answer ?? game.commonDenominator.answer,
-        moderatorNote: commonRound?.moderatorNote,
-        clues: (game.commonDenominatorItems[0]?.clues ?? game.commonDenominator.clues).map((clue, index) => ({
+  if (roundTypes.includes("question")) {
+    rounds.push({
+      id: questionRound?.id ?? "round-otazky",
+      type: "question" as const,
+      title: questionRound?.title ?? "Riskuj",
+      categories: game.categories,
+      questions: game.questions,
+      items: game.questions
+    });
+  }
+
+  if (roundTypes.includes("listening")) {
+    rounds.push({
+      id: listeningRound?.id ?? "round-poslech",
+      type: "listening" as const,
+      title: listeningRound?.title ?? "Poslechové kolo",
+      categories: game.listeningGenres,
+      tracks: game.listeningItems.map((item) => ({
+        ...item,
+        categoryId: item.categoryId ?? item.genreId ?? game.listeningGenres[0]?.id ?? "",
+        genreId: item.genreId ?? item.categoryId,
+        points: item.points ?? 100,
+        trackTitleAnswer: item.trackTitleAnswer ?? item.title ?? item.answer,
+        artistAnswer: item.artistAnswer ?? item.artist ?? "",
+        audioUrl: item.audio?.src ?? item.audioUrl,
+        scoring: { artist: 1000, title: 3000, both: 5000 }
+      })),
+      items: game.listeningItems
+    });
+  }
+
+  if (roundTypes.includes("common-denominator")) {
+    rounds.push({
+      id: commonRound?.id ?? "round-spolecny-jmenovatel",
+      type: "common-denominator" as const,
+      title: commonRound?.title ?? "Společný jmenovatel",
+      points: commonRound?.points ?? 300,
+      answer: game.commonDenominatorItems[0]?.answer ?? game.commonDenominator.answer,
+      moderatorNote: commonRound?.moderatorNote,
+      clues: (game.commonDenominatorItems[0]?.clues ?? game.commonDenominator.clues).map(
+        (clue, index) => ({
+          ...clue,
+          order: clue.order ?? index + 1,
+          prompt: clue.prompt ?? clue.text ?? ""
+        })
+      ),
+      items: game.commonDenominatorItems.map((item) => ({
+        ...item,
+        clues: item.clues.map((clue, index) => ({
           ...clue,
           order: clue.order ?? index + 1,
           prompt: clue.prompt ?? clue.text ?? ""
         })),
-        items: game.commonDenominatorItems.map((item) => ({
-          ...item,
-          clues: item.clues.map((clue, index) => ({
-            ...clue,
-            order: clue.order ?? index + 1,
-            prompt: clue.prompt ?? clue.text ?? ""
-          }))
-        }))
-      }
-    ]
+        explanation: item.explanation ?? item.moderatorNote
+      }))
+    });
+  }
+
+  return {
+    ...game,
+    createdAt: game.createdAt ?? now,
+    updatedAt: game.updatedAt ?? now,
+    rounds
   };
 }
 
 export function validateGame(game: EditableGame): string[] {
   const messages: string[] = [];
+  const activeRoundTypes =
+    game.rounds.length > 0
+      ? new Set(game.rounds.map((round) => round.type))
+      : new Set<RoundType>(["question", "listening", "common-denominator"]);
 
   if (!game.title.trim()) {
     messages.push("Název hry nesmí být prázdný.");
   }
-  if (game.categories.some((category) => !category.title.trim())) {
+  if (activeRoundTypes.has("question") && game.categories.some((category) => !category.title.trim())) {
     messages.push("Název kategorie nesmí být prázdný.");
   }
-  if (game.listeningGenres.some((genre) => !genre.title.trim())) {
+  if (activeRoundTypes.has("listening") && game.listeningGenres.some((genre) => !genre.title.trim())) {
     messages.push("Název žánru nesmí být prázdný.");
   }
-  if (game.questions.some((question) => !question.prompt.trim() || !question.answer.trim())) {
+  if (
+    activeRoundTypes.has("question") &&
+    game.questions.some((question) => !question.prompt.trim() || !question.answer.trim())
+  ) {
     messages.push("Otázka musí mít vyplněné zadání i odpověď.");
   }
-  if (game.listeningItems.some((item) => !item.prompt.trim() || !item.answer.trim())) {
-    messages.push("Poslechová položka musí mít zadání i odpověď.");
+  if (
+    activeRoundTypes.has("listening") &&
+    game.listeningItems.some(
+      (item) => !(item.artist ?? "").trim() || !(item.title ?? item.trackTitle ?? "").trim()
+    )
+  ) {
+    messages.push("Poslechová položka musí mít vyplněného interpreta i název skladby.");
   }
-  if (game.commonDenominatorItems.some((item) => !item.title.trim())) {
+  if (
+    activeRoundTypes.has("common-denominator") &&
+    game.commonDenominatorItems.some((item) => !item.title.trim())
+  ) {
     messages.push("Položka třetího kola musí mít vyplněný název.");
   }
-  if (!game.commonDenominator.answer.trim() && game.commonDenominatorItems.length === 0) {
+  if (
+    activeRoundTypes.has("common-denominator") &&
+    !game.commonDenominator.answer.trim() &&
+    game.commonDenominatorItems.length === 0
+  ) {
     messages.push("Třetí kolo musí mít vyplněný společný jmenovatel.");
   }
-  if (game.commonDenominatorItems.some((item) => !item.answer.trim())) {
+  if (
+    activeRoundTypes.has("common-denominator") &&
+    game.commonDenominatorItems.some((item) => !item.answer.trim())
+  ) {
     messages.push("Každá položka třetího kola musí mít vyplněný společný jmenovatel.");
   }
-  if (game.commonDenominator.clues.some((clue) => !(clue.text ?? "").trim())) {
+  if (
+    activeRoundTypes.has("common-denominator") &&
+    game.commonDenominator.clues.some((clue) => !(clue.text ?? "").trim())
+  ) {
     messages.push("Indicie ve třetím kole nesmí být prázdná.");
   }
   if (
+    activeRoundTypes.has("common-denominator") &&
     game.commonDenominatorItems.some((item) =>
       item.clues.some((clue) => !(clue.text ?? clue.prompt ?? "").trim())
     )
@@ -304,6 +375,7 @@ export default function GameEditor({
           {
             id: makeId("listen"),
             genreId: genre.id,
+            categoryId: genre.id,
             title: "",
             artist: "",
             prompt: "",
@@ -312,6 +384,26 @@ export default function GameEditor({
         ]
       };
     });
+  }
+
+  function addRound() {
+    setGame((current) => {
+      if (current.rounds.length > 0) {
+        return current;
+      }
+
+      return {
+        ...current,
+        rounds: [{ id: makeId("round"), type: "question", title: "Otázkové kolo", categories: [], questions: [] }]
+      };
+    });
+  }
+
+  function changePrimaryRoundType(type: RoundType) {
+    setGame((current) => ({
+      ...current,
+      rounds: [createRoundShell(type, current)]
+    }));
   }
 
   function addCommonDenominatorItem() {
@@ -392,6 +484,28 @@ export default function GameEditor({
 
   return (
     <form className="editor-form" aria-label="Editor hry" onSubmit={handleSubmit}>
+      <section className="editor-section">
+        <div className="section-heading-row">
+          <h2>Kola hry</h2>
+          <button className="button-compact" type="button" onClick={addRound}>
+            Přidat kolo
+          </button>
+        </div>
+        {game.rounds[0] ? (
+          <label className="field-stack">
+            <span>Typ kola</span>
+            <select
+              value={game.rounds[0].type}
+              onChange={(event) => changePrimaryRoundType(event.target.value as RoundType)}
+            >
+              <option value="question">Otázkové kolo</option>
+              <option value="listening">Poslechové kolo</option>
+              <option value="common-denominator">Společný jmenovatel</option>
+            </select>
+          </label>
+        ) : null}
+      </section>
+
       <section className="editor-section">
         <div className="section-heading-row">
           <h2>Import a export</h2>
@@ -483,6 +597,30 @@ export default function GameEditor({
 
       <section className="editor-section">
         <h2>Druhé kolo: poslech</h2>
+        <label className="field-stack">
+          <span>Žánr / sloupec</span>
+          <input
+            value={game.listeningGenres[0]?.title ?? ""}
+            onChange={(event) =>
+              setGame((current) => {
+                const genre = current.listeningGenres[0] ?? { id: makeId("genre"), title: "" };
+                const nextGenre = { ...genre, title: event.target.value };
+                return {
+                  ...current,
+                  listeningGenres: [
+                    nextGenre,
+                    ...current.listeningGenres.filter((candidate) => candidate.id !== genre.id)
+                  ],
+                  listeningItems: current.listeningItems.map((item) => ({
+                    ...item,
+                    genreId: item.genreId ?? nextGenre.id,
+                    categoryId: item.categoryId ?? nextGenre.id
+                  }))
+                };
+              })
+            }
+          />
+        </label>
         <CategoryEditor
           title="Žánry poslechového kola"
           addLabel="Přidat žánr"
@@ -511,6 +649,9 @@ export default function GameEditor({
           <button className="button-compact" type="button" onClick={addListeningItem}>
             Přidat poslechovou položku
           </button>
+          <button className="button-compact" type="button" onClick={addListeningItem}>
+            Přidat poslechový track
+          </button>
         </div>
         <div className="item-list">
           {game.listeningItems.map((item) => (
@@ -538,6 +679,9 @@ export default function GameEditor({
           <button className="button-compact" type="button" onClick={addCommonDenominatorItem}>
             Přidat společný jmenovatel
           </button>
+          <button className="button-compact" type="button" onClick={addCommonDenominatorItem}>
+            Přidat položku
+          </button>
         </div>
         <div className="item-list">
           {game.commonDenominatorItems.map((item, index) => (
@@ -548,6 +692,57 @@ export default function GameEditor({
                   value={item.title}
                   onChange={(event) =>
                     updateCommonDenominatorItem({ ...item, title: event.target.value })
+                  }
+                />
+              </label>
+              <label className="field-stack">
+                <span>Clues</span>
+                <textarea
+                  value={item.clues.map((clue) => clue.text ?? clue.prompt ?? "").join("\n")}
+                  onChange={(event) =>
+                    updateCommonDenominatorItem({
+                      ...item,
+                      clues: event.target.value.split("\n").map((text, clueIndex) => ({
+                        id: item.clues[clueIndex]?.id ?? makeId("clue"),
+                        text,
+                        prompt: text,
+                        order: clueIndex + 1
+                      }))
+                    })
+                  }
+                />
+              </label>
+              <label className="field-stack">
+                <span>Správná odpověď</span>
+                <input
+                  value={item.answer}
+                  onChange={(event) =>
+                    updateCommonDenominatorItem({ ...item, answer: event.target.value })
+                  }
+                />
+              </label>
+              <label className="field-stack">
+                <span>Vysvětlení pro moderátora</span>
+                <textarea
+                  value={item.explanation ?? item.moderatorNote ?? ""}
+                  onChange={(event) =>
+                    updateCommonDenominatorItem({
+                      ...item,
+                      explanation: event.target.value || undefined,
+                      moderatorNote: event.target.value || undefined
+                    })
+                  }
+                />
+              </label>
+              <label className="field-stack">
+                <span>Nápověda</span>
+                <input
+                  value={item.hint ?? ""}
+                  onChange={(event) =>
+                    updateCommonDenominatorItem({
+                      ...item,
+                      hint: event.target.value || undefined
+                    })
                   }
                 />
               </label>
@@ -587,6 +782,41 @@ export default function GameEditor({
       </div>
     </form>
   );
+}
+
+export { GameEditor };
+
+function createRoundShell(type: RoundType, game: EditableGame): Game["rounds"][number] {
+  if (type === "listening") {
+    return {
+      id: game.rounds[0]?.id ?? makeId("round"),
+      type,
+      title: "Poslechové kolo",
+      categories: game.listeningGenres,
+      tracks: game.listeningItems
+    };
+  }
+
+  if (type === "common-denominator") {
+    return {
+      id: game.rounds[0]?.id ?? makeId("round"),
+      type,
+      title: "Společný jmenovatel",
+      points: 300,
+      answer: game.commonDenominatorItems[0]?.answer ?? "",
+      clues: game.commonDenominatorItems[0]?.clues ?? [],
+      items: game.commonDenominatorItems
+    };
+  }
+
+  return {
+    id: game.rounds[0]?.id ?? makeId("round"),
+    type,
+    title: "Otázkové kolo",
+    categories: game.categories,
+    questions: game.questions,
+    items: game.questions
+  };
 }
 
 function slugify(value: string) {

@@ -15,7 +15,7 @@ describe("GameBoard", () => {
       />
     );
 
-    for (const category of demoGame.categories) {
+    for (const category of demoGame.categories!) {
       expect(screen.getByText(category.title)).toBeInTheDocument();
     }
   });
@@ -64,7 +64,7 @@ describe("GameBoard", () => {
   it("renders sparse boards with visible disabled cells", () => {
     const sparseGame: Game = {
       ...demoGame,
-      questions: demoGame.questions.filter(
+      questions: demoGame.questions!.filter(
         (question) => question.id !== "riskuj-66-q-24"
       )
     };

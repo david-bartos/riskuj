@@ -120,7 +120,7 @@ export function AdminPage() {
         const summary = {
           id: savedGame.id,
           title: savedGame.title,
-          updatedAt: savedGame.updatedAt,
+          updatedAt: savedGame.updatedAt ?? savedGame.createdAt ?? "",
           roundCount: savedGame.rounds.length
         };
         const existingIndex = currentGames.findIndex((current) => current.id === savedGame.id);

@@ -39,6 +39,115 @@ const gameFixture: Game = {
 };
 
 describe("GameEditor", () => {
+  it("vytvoří poslechový track s audio assetem z prázdné hry", async () => {
+    const onSave = vi.fn();
+    const emptyGame: Game = {
+      id: "empty-game",
+      title: "Prázdná hra",
+      teams: [{ id: "team-a", name: "Tým A" }],
+      rounds: []
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => ({
+          id: "audio-test",
+          src: "/uploads/audio-test.mp3",
+          title: "audio-test",
+          fileName: "audio-test.mp3",
+          mimeType: "audio/mpeg"
+        })
+      })
+    );
+
+    render(<GameEditor initialGame={emptyGame} onSave={onSave} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Přidat kolo" }));
+    fireEvent.change(screen.getByLabelText("Typ kola"), { target: { value: "listening" } });
+    fireEvent.click(screen.getByRole("button", { name: "Přidat poslechový track" }));
+
+    fireEvent.change(screen.getByLabelText("Žánr / sloupec"), { target: { value: "Pop" } });
+    fireEvent.change(screen.getByLabelText("Interpret"), { target: { value: "Ewa Farna" } });
+    fireEvent.change(screen.getByLabelText("Název skladby"), {
+      target: { value: "Měls mě vůbec rád" }
+    });
+    fireEvent.change(screen.getByLabelText("MP3 soubor"), {
+      target: {
+        files: [new File(["ID3"], "audio-test.mp3", { type: "audio/mpeg" })]
+      }
+    });
+
+    await screen.findByText("/uploads/audio-test.mp3");
+    fireEvent.click(screen.getByRole("button", { name: "Uložit hru" }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    const savedGame = onSave.mock.calls[0][0] as Game;
+    const listeningRound = savedGame.rounds[0];
+
+    expect(listeningRound.type).toBe("listening");
+    if (listeningRound.type !== "listening") {
+      throw new Error("Expected listening round");
+    }
+    expect(listeningRound.tracks[0]).toMatchObject({
+      artist: "Ewa Farna",
+      title: "Měls mě vůbec rád",
+      audio: { src: "/uploads/audio-test.mp3" }
+    });
+  });
+
+  it("vytvoří položku společného jmenovatele z prázdné hry", () => {
+    const onSave = vi.fn();
+    const emptyGame: Game = {
+      id: "empty-game",
+      title: "Prázdná hra",
+      teams: [{ id: "team-a", name: "Tým A" }],
+      rounds: []
+    };
+
+    render(<GameEditor initialGame={emptyGame} onSave={onSave} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Přidat kolo" }));
+    fireEvent.change(screen.getByLabelText("Typ kola"), {
+      target: { value: "common-denominator" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Přidat položku" }));
+
+    fireEvent.change(screen.getByLabelText("Clues"), {
+      target: { value: "Queen\nABBA\nAqua" }
+    });
+    fireEvent.change(screen.getByLabelText("Správná odpověď"), {
+      target: { value: "Krátké názvy kapel" }
+    });
+    fireEvent.change(screen.getByLabelText("Vysvětlení pro moderátora"), {
+      target: { value: "Všechny clues jsou jednoslovné kapely." }
+    });
+    fireEvent.change(screen.getByLabelText("Nápověda"), {
+      target: { value: "Počítejte slova." }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Uložit hru" }));
+
+    const savedGame = onSave.mock.calls[0][0] as Game;
+    const round = savedGame.rounds[0];
+
+    expect(round.type).toBe("common-denominator");
+    if (round.type !== "common-denominator") {
+      throw new Error("Expected common denominator round");
+    }
+    expect(round.items?.[0]).toMatchObject({
+      clues: [
+        { text: "Queen", prompt: "Queen" },
+        { text: "ABBA", prompt: "ABBA" },
+        { text: "Aqua", prompt: "Aqua" }
+      ],
+      answer: "Krátké názvy kapel",
+      moderatorNote: "Všechny clues jsou jednoslovné kapely.",
+      hint: "Počítejte slova."
+    });
+  });
+
   it("před startem umožní upravit šest názvů týmů a uloží je", () => {
     const onSave = vi.fn();
     render(<GameEditor initialGame={gameFixture} onSave={onSave} />);
@@ -106,7 +215,7 @@ describe("GameEditor", () => {
       title: "Importovaná hra",
       questions: [
         {
-          ...gameFixture.questions[0],
+          ...gameFixture.questions![0],
           id: "import-question-1",
           prompt: "Importovaná otázka"
         }
@@ -140,7 +249,7 @@ describe("GameEditor", () => {
     const savedGame = prepareGameForSave(
       normalizeGame({
         ...gameFixture,
-        questions: [{ ...gameFixture.questions[0], audio }]
+        questions: [{ ...gameFixture.questions![0], audio }]
       })
     );
 

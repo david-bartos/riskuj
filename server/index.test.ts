@@ -164,7 +164,7 @@ describe("server", () => {
 
     expect(response.body.title).toBe("Přejmenovaná hra");
     expect(new Date(response.body.updatedAt).getTime()).toBeGreaterThan(
-      new Date(savedGame.updatedAt).getTime()
+      new Date(savedGame.updatedAt!).getTime()
     );
   });
 
