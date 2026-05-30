@@ -79,15 +79,15 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Uložit hru" })).toBeInTheDocument();
   });
 
-  it("zobrazí herní tabuli na /play bez běžné navigace okolo presenteru", async () => {
+  it("zobrazí herní tabuli na /play bez redundantního odkazu na aktuální hru", async () => {
     window.history.pushState({}, "", "/play/riskuj-2026-06-06");
 
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "Riskuj!" })).toBeInTheDocument();
-    expect(screen.queryByRole("navigation", { name: "Hlavní navigace" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Domů" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Editor" })).not.toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Hlavní navigace" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Domů" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Editor" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Riskuj 6.6" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("tablist", { name: "Kola soutěže" })).toHaveLength(1);
     expect(
