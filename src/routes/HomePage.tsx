@@ -25,7 +25,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
         <button
           className="button-secondary"
           type="button"
-          onClick={() => onNavigate("/play/demo")}
+          onClick={() => onNavigate("/play/riskuj-2026-06-06")}
         >
           Spustit hru
         </button>

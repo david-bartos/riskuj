@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { demoGame } from "../data/demoGame";
+import type { Game } from "../types/game";
 import AdminPage from "./AdminPage";
 
 const uploadedAsset = {
@@ -10,6 +10,88 @@ const uploadedAsset = {
   originalName: "uploaded.mp3",
   displayName: "Uploaded preview",
   mimeType: "audio/mpeg"
+};
+
+const adminGame: Game = {
+  id: "admin-test",
+  title: "Admin test",
+  teams: [{ id: "team-1", name: "Tým 1" }],
+  categories: [{ id: "cat-1", title: "Kategorie" }],
+  questions: [
+    {
+      id: "question-1",
+      categoryId: "cat-1",
+      points: 1000,
+      value: 1000,
+      prompt: "Otázka",
+      answer: "Odpověď"
+    }
+  ],
+  listeningGenres: [{ id: "genre-1", title: "Žánr" }],
+  listeningItems: [
+    {
+      id: "listen-1",
+      genreId: "genre-1",
+      categoryId: "genre-1",
+      title: "Track",
+      artist: "Interpret",
+      prompt: "Poznej skladbu",
+      answer: "Interpret - Track",
+      points: 5000,
+      value: 5000
+    }
+  ],
+  commonDenominator: {
+    answer: "Jmenovatel",
+    clues: [{ id: "clue-1", text: "Indicie", prompt: "Indicie", order: 1 }]
+  },
+  rounds: [
+    {
+      id: "round-1",
+      type: "question",
+      title: "Otázky",
+      categories: [{ id: "cat-1", title: "Kategorie" }],
+      questions: [
+        {
+          id: "question-1",
+          categoryId: "cat-1",
+          points: 1000,
+          value: 1000,
+          prompt: "Otázka",
+          answer: "Odpověď"
+        }
+      ]
+    },
+    {
+      id: "round-2",
+      type: "listening",
+      title: "Poslech",
+      categories: [{ id: "genre-1", title: "Žánr" }],
+      tracks: [
+        {
+          id: "listen-1",
+          genreId: "genre-1",
+          categoryId: "genre-1",
+          title: "Track",
+          artist: "Interpret",
+          prompt: "Poznej skladbu",
+          answer: "Interpret - Track",
+          points: 5000,
+          value: 5000
+        }
+      ]
+    },
+    {
+      id: "round-3",
+      type: "common-denominator",
+      title: "Společný jmenovatel",
+      answer: "Jmenovatel",
+      points: 5000,
+      clues: [{ id: "clue-1", text: "Indicie", prompt: "Indicie", order: 1 }]
+    }
+  ],
+  createdAt: "2026-05-30T10:00:00.000Z",
+  updatedAt: "2026-05-30T10:00:00.000Z"
 };
 
 describe("AdminPage", () => {
@@ -22,16 +104,16 @@ describe("AdminPage", () => {
         if (url === "/api/games" && !init) {
           return Response.json([
             {
-              id: demoGame.id,
-              title: demoGame.title,
-              updatedAt: demoGame.updatedAt,
-              roundCount: demoGame.rounds.length
+              id: adminGame.id,
+              title: adminGame.title,
+              updatedAt: adminGame.updatedAt,
+              roundCount: adminGame.rounds.length
             }
           ]);
         }
 
-        if (url === "/api/games/demo-hudebni-riskuj" && !init) {
-          return Response.json(demoGame);
+        if (url === "/api/games/admin-test" && !init) {
+          return Response.json(adminGame);
         }
 
         if (url === "/api/audio-assets" && !init) {
@@ -42,7 +124,7 @@ describe("AdminPage", () => {
           return Response.json(uploadedAsset);
         }
 
-        if (url === "/api/games/demo-hudebni-riskuj" && init?.method === "PUT") {
+        if (url === "/api/games/admin-test" && init?.method === "PUT") {
           return Response.json(JSON.parse(String(init.body)));
         }
 
@@ -81,7 +163,7 @@ describe("AdminPage", () => {
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
-        "/api/games/demo-hudebni-riskuj",
+        "/api/games/admin-test",
         expect.objectContaining({
           method: "PUT",
           headers: { "content-type": "application/json" }
@@ -92,8 +174,7 @@ describe("AdminPage", () => {
     const saveCall = vi
       .mocked(fetch)
       .mock.calls.find(
-        ([url, init]) =>
-          url === "/api/games/demo-hudebni-riskuj" && init?.method === "PUT"
+        ([url, init]) => url === "/api/games/admin-test" && init?.method === "PUT"
       );
     const savedGame = JSON.parse(String(saveCall?.[1]?.body));
     expect(JSON.stringify(savedGame)).toContain("/uploads/uploaded.mp3");

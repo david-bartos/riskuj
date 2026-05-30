@@ -12,7 +12,7 @@ describe("usePresenterFlow", () => {
     }
 
     act(() => result.current.selectTeam("team-1"));
-    act(() => result.current.selectItem(questionRound.id, questionRound.type, "q-ivan-mladek"));
+    act(() => result.current.selectItem(questionRound.id, questionRound.type, "riskuj-66-q-01"));
     expect(result.current.session.presenterStep).toBe("item-selected");
 
     act(() => result.current.advance());
@@ -26,7 +26,7 @@ describe("usePresenterFlow", () => {
     act(() => result.current.markQuestionCorrect());
     expect(result.current.scoreForTeam("team-1")).toBe(1000);
     expect(result.current.session.presenterStep).toBe("board");
-    expect(result.current.session.completedItemIds).toContain("q-ivan-mladek");
+    expect(result.current.session.completedItemIds).toContain("riskuj-66-q-01");
   });
 
   it("špatná odpověď nemění skóre", () => {
@@ -37,7 +37,7 @@ describe("usePresenterFlow", () => {
     }
 
     act(() => result.current.selectTeam("team-1"));
-    act(() => result.current.selectItem(questionRound.id, questionRound.type, "q-ivan-mladek"));
+    act(() => result.current.selectItem(questionRound.id, questionRound.type, "riskuj-66-q-01"));
     act(() => result.current.advance());
     act(() => result.current.advance());
     act(() => result.current.markQuestionWrong());
@@ -63,7 +63,9 @@ describe("usePresenterFlow", () => {
       throw new Error("Expected listening round");
     }
 
-    act(() => result.current.selectItem(listeningRound.id, listeningRound.type, "listen-dusilova"));
+    act(() =>
+      result.current.selectItem(listeningRound.id, listeningRound.type, "riskuj-66-listen-01")
+    );
     act(() => result.current.advance());
     act(() => result.current.advance());
     act(() => result.current.setListeningTeamScore("team-1", 1000));
@@ -82,7 +84,9 @@ describe("usePresenterFlow", () => {
       throw new Error("Expected common denominator round");
     }
 
-    act(() => result.current.selectItem(commonRound.id, commonRound.type, "cd-voda"));
+    act(() =>
+      result.current.selectItem(commonRound.id, commonRound.type, "riskuj-66-common-1")
+    );
     act(() => result.current.advance());
     act(() => result.current.advance());
     act(() => result.current.awardCommonDenominator("team-3"));

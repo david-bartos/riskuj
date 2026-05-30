@@ -1,6 +1,6 @@
 import type { AudioAsset, Game, GameSummary } from "../types/game";
 export type { GameSummary } from "../types/game";
-import { demoGame } from "../data/demoGame";
+import { getSeedGame, seedGames } from "../data/games";
 
 export class GamesClientError extends Error {
   constructor(
@@ -13,10 +13,12 @@ export class GamesClientError extends Error {
   }
 }
 
-const localGames = new Map<string, Game>([
-  [demoGame.id, demoGame],
-  ["demo", demoGame]
-]);
+const localGames = new Map<string, Game>(
+  seedGames.flatMap((game) => [
+    [game.id, game],
+    ["demo", game]
+  ])
+);
 
 export async function listGames(): Promise<GameSummary[]> {
   try {
@@ -29,7 +31,7 @@ export async function listGames(): Promise<GameSummary[]> {
       id: game.id,
       title: game.title,
       updatedAt: game.updatedAt,
-      roundCount: game.rounds.length,
+      roundCount: game.rounds.length
     }));
   }
 }
@@ -38,7 +40,7 @@ export async function loadGame(id: string): Promise<Game> {
   try {
     return await requestJson<Game>(`/api/games/${encodeURIComponent(id)}`);
   } catch (error) {
-    const game = localGames.get(id);
+    const game = localGames.get(id) ?? getSeedGame(id);
     if (game) {
       return cloneGame(game);
     }
@@ -127,7 +129,7 @@ export const gamesClient = {
   saveGame,
   listAudioAssets,
   uploadAudioAsset,
-  uploadAudio,
+  uploadAudio
 };
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {

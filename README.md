@@ -38,10 +38,10 @@ PORT=3101 npm run dev:server
 ## Příprava hry
 
 1. Otevři `http://localhost:5173/admin`.
-2. Vyber existující hru nebo klikni na `Nová hra`.
+2. Vyber existující hru `Riskuj 6.6`, jinou uloženou hru, nebo klikni na `Nová hra`.
 3. Vyplň první kolo: kategorie, hodnoty, zadání otázek a správné odpovědi.
 4. Vyplň druhé kolo: žánry, poslechové položky, interpreta, název skladby a odpověď pro moderátora.
-5. Vyplň třetí kolo: společný jmenovatel a indicie.
+5. Vyplň třetí kolo: šest položek společného jmenovatele, jejich indicie a odpovědi.
 6. Klikni na `Uložit hru`.
 
 Admin umí také `Exportovat JSON` a `Importovat JSON`. Export je dobrý jako záloha před větší úpravou. Import nahradí otevřenou hru a hned ji uloží. Přesný formát je popsaný v [docs/import-format.md](docs/import-format.md).
@@ -60,12 +60,28 @@ MP3 se nedávají do exportovaného JSON jako base64. Pokud hru přenášíš na
 
 ## Hraní a fullscreen
 
-Presenter otevři na `http://localhost:5173/play`.
+Presenter otevři na `http://localhost:5173/play/riskuj-2026-06-06` pro seed kvízu 6.6. Navigace `Spustit hru` a horní položka `Riskuj 6.6` vedou na stejnou hru.
 
 - Notebook připoj k projektoru nebo televizi.
 - V prohlížeči zapni fullscreen klávesou `F11` nebo tlačítkem v aplikaci, pokud je dostupné.
 - Moderátor ovládá postup hry ručně: vybere dlaždici, zobrazí otázku, pustí případné audio, odhalí odpověď a zapíše body.
 - Pro kvíz 6.6 je počítáno se 6 týmy a se všemi třemi koly: otázky, poslechy, společný jmenovatel.
+
+## Seed Riskuj 6.6
+
+Git-tracked seed je v `src/data/riskuj-2026-06-06.ts` a je dostupný přes API i klientský fallback jako `riskuj-2026-06-06`.
+
+- 1. kolo má 24 položek a distribuci hodnot 6x `1 000 Kč`, 6x `3 000 Kč`, 6x `5 000 Kč`, 6x `10 000 Kč`.
+- 2. kolo má 15 poslechových položek, žánrové sloupce, odpověď interpret + track a MP3 sloty, které se mají nahradit uploadem v adminu.
+- 3. kolo má 6 položek společného jmenovatele.
+
+Známé nejasnosti jsou zapsané přímo ve fixture v `knownIssues` a položky mají `reviewStatus: "needs-source"`:
+
+- Dostupný kanonický Obsidian soubor neobsahuje finální texty 24 otázek, přesný tracklist ani 6 hotových společných jmenovatelů.
+- Zadání říká 14 tracků, ale popisuje seznam s 15 položkami.
+- Položka J.A.R. nemá uvedený název skladby.
+
+Seed proto používá jednoznačné texty `Doplnit...`, aby šla hra spustit a otestovat bez vymýšlení obsahu za Davida. Před akcí je potřeba v adminu doplnit finální otázky, varianty, odpovědi, tracky a MP3 soubory.
 
 ## Lokální data
 

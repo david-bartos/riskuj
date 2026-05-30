@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 import { demoGame } from "./demoGame";
 
 describe("demoGame", () => {
+  it("ukazuje na seed Riskuj 6.6", () => {
+    expect(demoGame.id).toBe("riskuj-2026-06-06");
+    expect(demoGame.title).toBe("Riskuj 6.6");
+  });
+
   it("obsahuje šest výchozích týmů a všechna tři kola", () => {
-    expect(demoGame.id.trim()).not.toEqual("");
     expect(demoGame.teams.map((team) => team.name)).toEqual([
       "Tým 1",
       "Tým 2",
@@ -29,7 +33,8 @@ describe("demoGame", () => {
     expect(new Set((round.items ?? []).map((item) => item.value))).toEqual(
       new Set([1000, 3000, 5000, 10000])
     );
-    expect(round.items?.[0]?.answer).toBe("Ivan Mládek");
+    expect(round.items).toHaveLength(24);
+    expect(round.items?.[0]?.answer).toBe("Doplnit správnou odpověď podle finálního zadání.");
     expect(round.items?.[0]?.moderatorNote).toBeTruthy();
   });
 
@@ -41,14 +46,8 @@ describe("demoGame", () => {
     }
 
     expect(round.genres?.length).toBeGreaterThan(0);
-    expect(round.items?.[0]).toMatchObject({
-      artist: "Lenka Dusilová",
-      trackTitle: "Pro Tebe",
-      audio: {
-        src: "/uploads/demo-placeholder.mp3",
-        title: "Ukázka poslechu"
-      }
-    });
+    expect(round.items).toHaveLength(15);
+    expect(round.items?.some((item) => item.artist === "J.A.R.")).toBe(true);
   });
 
   it("má kolo společného jmenovatele s clues a odpovědí", () => {
@@ -58,8 +57,9 @@ describe("demoGame", () => {
       return;
     }
 
+    expect(round.items).toHaveLength(6);
     expect(round.items?.[0]?.clues.length).toBeGreaterThanOrEqual(2);
-    expect(round.items?.[0]?.answer).toBe("Voda");
+    expect(round.items?.[0]?.answer).toBe("Doplnit odpověď 1");
     expect(round.items?.[0]?.value).toBe(5000);
   });
 });

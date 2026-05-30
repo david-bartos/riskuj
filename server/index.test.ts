@@ -4,6 +4,7 @@ import { basename, join } from "node:path";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Game } from "../src/types/game";
+import { riskuj20260606Game } from "../src/data/riskuj-2026-06-06";
 import { createServer } from "./index";
 import { GamesRepository } from "./gamesRepository";
 
@@ -57,14 +58,38 @@ describe("server", () => {
 
     const response = await request(app).get("/api/games").expect(200);
 
-    expect(response.body).toEqual([
-      {
-        id: "ulozena-hra",
-        title: "Uložená hra",
-        updatedAt: "2026-05-30T11:00:00.000Z",
-        roundCount: 0
-      }
-    ]);
+    expect(response.body).toEqual(
+      expect.arrayContaining([
+        {
+          id: "ulozena-hra",
+          title: "Uložená hra",
+          updatedAt: "2026-05-30T11:00:00.000Z",
+          roundCount: 0
+        }
+      ])
+    );
+  });
+
+  it("vrátí seed Riskuj 6.6 v seznamu her i bez runtime souboru", async () => {
+    const app = createTestServer();
+
+    const response = await request(app).get("/api/games").expect(200);
+
+    expect(response.body).toContainEqual(
+      expect.objectContaining({
+        id: "riskuj-2026-06-06",
+        title: "Riskuj 6.6",
+        roundCount: 3
+      })
+    );
+  });
+
+  it("načte seed Riskuj 6.6 podle ID", async () => {
+    const app = createTestServer();
+
+    const response = await request(app).get("/api/games/riskuj-2026-06-06").expect(200);
+
+    expect(response.body).toEqual(riskuj20260606Game);
   });
 
   it("načte detail hry podle ID", async () => {
