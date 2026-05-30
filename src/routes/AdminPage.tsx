@@ -102,7 +102,7 @@ export function AdminPage() {
   }
 
   async function handleUploadAudio(file: File) {
-    const asset = await gamesClient.uploadAudioAsset(file);
+    const asset = await gamesClient.uploadAudio(file);
     setAudioAssets((currentAssets) => [...currentAssets, asset]);
     return asset;
   }
