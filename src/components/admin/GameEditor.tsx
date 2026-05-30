@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import type {
   AudioAsset,
   Category,
@@ -14,6 +14,11 @@ import {
   FirstRoundQuestionEditor,
   ListeningItemEditor
 } from "./QuestionEditor";
+import {
+  GameJsonValidationError,
+  parseGameJson,
+  serializeGameToJson
+} from "../../importExport/gameJson";
 
 const questionPoints: QuestionPoints[] = [100, 200, 300, 400, 500];
 
@@ -260,8 +265,74 @@ export default function GameEditor({
     await onSave(prepareGameForSave(game));
   }
 
+  function handleExportJson() {
+    const preparedGame = prepareGameForSave(game);
+    const blob = new Blob([serializeGameToJson(preparedGame)], {
+      type: "application/json;charset=utf-8"
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${slugify(preparedGame.title)}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleImportJson(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Import nahradí aktuálně otevřenou hru a hned ji uloží. Pokračovat?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const importedGame = parseGameJson(await readFileAsText(file));
+      const normalizedGame = normalizeGame(importedGame);
+      setErrors([]);
+      await onSave(prepareGameForSave(normalizedGame));
+      setGame(normalizedGame);
+    } catch (error) {
+      const message =
+        error instanceof GameJsonValidationError || error instanceof Error
+          ? error.message
+          : "Import se nepodařil.";
+      setErrors([message]);
+    }
+  }
+
   return (
     <form className="editor-form" aria-label="Editor hry" onSubmit={handleSubmit}>
+      <section className="editor-section">
+        <div className="section-heading-row">
+          <h2>Import a export</h2>
+          <div className="inline-actions">
+            <button type="button" onClick={handleExportJson}>
+              Exportovat JSON
+            </button>
+            <label className="button-like">
+              <span>Importovat JSON</span>
+              <input
+                aria-label="Importovat JSON hry"
+                accept="application/json,.json"
+                type="file"
+                onChange={(event) => void handleImportJson(event)}
+              />
+            </label>
+          </div>
+        </div>
+      </section>
+
       <label className="field-stack">
         <span>Název hry</span>
         <input
@@ -417,4 +488,24 @@ export default function GameEditor({
       </div>
     </form>
   );
+}
+
+function slugify(value: string) {
+  const slug = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return slug || "riskuj-hra";
+}
+
+function readFileAsText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result ?? "")));
+    reader.addEventListener("error", () => reject(reader.error ?? new Error("Soubor nejde přečíst.")));
+    reader.readAsText(file);
+  });
 }

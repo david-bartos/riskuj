@@ -143,7 +143,10 @@ export function AdminPage() {
       <header className="admin-header">
         <p className="intro-kicker">Moderátorský pult</p>
         <h1>Editor hry</h1>
-        <p className="intro-text">Upravte otázky, poslechové ukázky a třetí kolo.</p>
+        <p className="intro-text">
+          Upravte otázky, poslechové ukázky a třetí kolo. Hru můžete také vyexportovat nebo
+          nahradit importem z JSON souboru.
+        </p>
       </header>
 
       <section className="admin-toolbar" aria-label="Správa her">

@@ -729,6 +729,25 @@ button {
   cursor: pointer;
 }
 
+.button-like {
+  min-height: 2.75rem;
+  border: 1px solid rgba(248, 216, 102, 0.55);
+  border-radius: 8px;
+  padding: 0.7rem 1rem;
+  color: #07142d;
+  background: #f8d866;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.button-like input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
 button:disabled {
   cursor: wait;
   opacity: 0.65;
