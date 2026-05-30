@@ -31,10 +31,13 @@ export default function AudioUploadField({
   const selectId = useId();
   const uploadId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const uploadSequenceRef = useRef(0);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
 
   async function handleUpload(file: File | undefined) {
+    const uploadSequence = uploadSequenceRef.current + 1;
+    uploadSequenceRef.current = uploadSequence;
     setError("");
     setStatus("");
 
@@ -57,9 +60,15 @@ export default function AudioUploadField({
 
     try {
       const asset = await onUploadAudio(file);
+      if (uploadSequenceRef.current !== uploadSequence) {
+        return;
+      }
       onChange(asset);
       setStatus("Audio je připojené.");
     } catch (uploadError) {
+      if (uploadSequenceRef.current !== uploadSequence) {
+        return;
+      }
       const message = uploadError instanceof Error ? uploadError.message : "MP3 se nepodařilo nahrát.";
       setStatus("");
       setError(message);
@@ -79,6 +88,7 @@ export default function AudioUploadField({
             id={selectId}
             value={audio?.id ?? ""}
             onChange={(event) => {
+              uploadSequenceRef.current += 1;
               const asset = audioAssets.find((candidate) => candidate.id === event.target.value);
               onChange(asset);
               setError("");
@@ -110,7 +120,14 @@ export default function AudioUploadField({
         <div className="audio-preview" aria-label="Aktuální audio">
           <span>Aktuální audio: {getAudioLabel(audio)}</span>
           <audio aria-label="Náhled audio ukázky" controls src={audio.src} />
-          <button type="button" className="button-compact" onClick={() => onChange(undefined)}>
+          <button
+            type="button"
+            className="button-compact"
+            onClick={() => {
+              uploadSequenceRef.current += 1;
+              onChange(undefined);
+            }}
+          >
             Odebrat audio
           </button>
         </div>
