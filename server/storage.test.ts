@@ -17,6 +17,10 @@ function createValidGame(overrides: Partial<Game> = {}): Game {
   return {
     id: "test-game",
     title: "Testovaci hra",
+    teams: [],
+    rounds: [],
+    createdAt: "2026-05-30T10:00:00.000Z",
+    updatedAt: "2026-05-30T10:00:00.000Z",
     categories: [{ id: "music", title: "Hudba" }],
     questions: [
       {

@@ -1,20 +1,28 @@
-import type { Game, QuestionPoints } from "../types/game";
+import type { Game, Question, QuestionCategory, QuestionPoints, Team } from "../types/game";
 
 const demoAudioSrc = "/uploads/demo-placeholder.mp3";
+const demoTimestamp = "2026-05-30T00:00:00.000Z";
 
 const questionPoints: QuestionPoints[] = [100, 200, 300, 400, 500];
 
-export const demoGame: Game = {
-  id: "demo-hudebni-riskuj",
-  title: "Hudební Riskuj",
-  categories: [
-    { id: "ceske-hity", title: "České hity" },
-    { id: "zahranicni-rock", title: "Zahraniční rock" },
-    { id: "filmova-hudba", title: "Filmová hudba" },
-    { id: "devadesatky", title: "Devadesátky" },
-    { id: "poznej-interpreta", title: "Poznej interpreta" }
-  ],
-  questions: [
+const demoTeams: Team[] = [
+  { id: "team-1", name: "Tým 1", color: "#d62828" },
+  { id: "team-2", name: "Tým 2", color: "#f77f00" },
+  { id: "team-3", name: "Tým 3", color: "#fcbf49" },
+  { id: "team-4", name: "Tým 4", color: "#2a9d8f" },
+  { id: "team-5", name: "Tým 5", color: "#457b9d" },
+  { id: "team-6", name: "Tým 6", color: "#6d597a" }
+];
+
+const categories: QuestionCategory[] = [
+  { id: "ceske-hity", title: "České hity" },
+  { id: "zahranicni-rock", title: "Zahraniční rock" },
+  { id: "filmova-hudba", title: "Filmová hudba" },
+  { id: "devadesatky", title: "Devadesátky" },
+  { id: "poznej-interpreta", title: "Poznej interpreta" }
+];
+
+const questions: Question[] = [
     {
       id: "ceske-hity-100",
       categoryId: "ceske-hity",
@@ -222,5 +230,25 @@ export const demoGame: Game = {
       prompt: "Poznej interpreta podle nápovědy: Island, experimentální pop a album Debut.",
       answer: "Björk"
     }
-  ]
+];
+
+export const demoGame: Game = {
+  id: "demo-hudebni-riskuj",
+  title: "Hudební Riskuj",
+  teams: demoTeams,
+  rounds: [
+    {
+      id: "round-otazky",
+      type: "question",
+      title: "Riskuj",
+      categories,
+      questions
+    }
+  ],
+  createdAt: demoTimestamp,
+  updatedAt: demoTimestamp,
+  categories,
+  questions
 };
+
+export { questionPoints as demoQuestionPoints };
