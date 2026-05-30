@@ -75,3 +75,67 @@ h1 {
   font-size: clamp(1rem, 2.4vw, 1.25rem);
   line-height: 1.65;
 }
+
+.audio-player {
+  width: min(100%, 44rem);
+  color: #f6f8ff;
+}
+
+.audio-player__content {
+  display: grid;
+  gap: 1rem;
+  justify-items: center;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(3, 19, 48, 0.76);
+  text-align: center;
+}
+
+.audio-player__title {
+  margin: 0;
+  color: #f8d866;
+  font-size: clamp(1.3rem, 4vw, 2.25rem);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.audio-player__button {
+  width: min(100%, 32rem);
+  min-height: 5rem;
+  padding: 1rem 1.5rem;
+  border: 2px solid rgba(255, 255, 255, 0.82);
+  border-radius: 8px;
+  color: #06142e;
+  background: #f8d866;
+  box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  font-size: clamp(1.5rem, 5vw, 3rem);
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.audio-player__button:hover:not(:disabled),
+.audio-player__button:focus-visible:not(:disabled) {
+  background: #ffe987;
+}
+
+.audio-player__button:focus-visible {
+  outline: 4px solid #ffffff;
+  outline-offset: 4px;
+}
+
+.audio-player__button:disabled {
+  color: rgba(246, 248, 255, 0.62);
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.audio-player__message {
+  max-width: 34rem;
+  margin: 0;
+  color: #d9e7ff;
+  font-size: clamp(1rem, 2.5vw, 1.5rem);
+  line-height: 1.45;
+}
