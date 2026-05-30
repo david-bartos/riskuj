@@ -54,15 +54,12 @@ describe("PlayPage", () => {
     expect(screen.queryByText(/Uznat/i)).not.toBeInTheDocument();
   });
 
-  it("Enter odhalí prompt a druhý Enter odpověď pro běžnou otázku", async () => {
+  it("klik na dlaždici otevře prompt a Enter odhalí odpověď pro běžnou otázku", async () => {
     render(<PlayPage gameId="demo-hudebni-riskuj" />);
 
     await screen.findByRole("heading", { name: demoGame.title });
     fireEvent.click(screen.getByRole("button", { name: /České hity za 100/i }));
 
-    expect(screen.queryByText(/Lady Carneval/i)).not.toBeInTheDocument();
-
-    fireEvent.keyDown(window, { key: "Enter" });
     expect(await screen.findByText(/Lady Carneval/i)).toBeInTheDocument();
     expect(screen.queryByText("Karel Gott")).not.toBeInTheDocument();
 
@@ -75,7 +72,6 @@ describe("PlayPage", () => {
 
     await screen.findByRole("heading", { name: demoGame.title });
     fireEvent.click(screen.getByRole("button", { name: /Poslech za 100/i }));
-    fireEvent.keyDown(window, { key: "Enter" });
 
     expect(await screen.findByLabelText("Přehrát audio ukázku")).toBeInTheDocument();
     expect(screen.queryByText("Shallow")).not.toBeInTheDocument();
@@ -119,7 +115,6 @@ describe("PlayPage", () => {
 
     await screen.findByRole("heading", { name: demoGame.title });
     fireEvent.click(screen.getByRole("button", { name: /Poslech za 100/i }));
-    fireEvent.keyDown(window, { key: "Enter" });
 
     const audio = await screen.findByLabelText("Přehrát audio ukázku");
     expect(audio).toHaveAttribute(
@@ -137,7 +132,6 @@ describe("PlayPage", () => {
 
     await screen.findByRole("heading", { name: demoGame.title });
     fireEvent.click(screen.getByRole("button", { name: /České hity za 100/i }));
-    fireEvent.keyDown(window, { key: "Enter" });
     fireEvent.keyDown(window, { key: "Enter" });
 
     fireEvent.change(screen.getByLabelText("Bodovaný tým"), {
@@ -159,7 +153,6 @@ describe("PlayPage", () => {
     expect(playSfxMock).toHaveBeenCalledWith("open");
 
     fireEvent.keyDown(window, { key: "Enter" });
-    fireEvent.keyDown(window, { key: "Enter" });
     fireEvent.click(screen.getByRole("button", { name: "Správně" }));
 
     expect(playSfxMock).toHaveBeenCalledWith("correct");
@@ -173,7 +166,6 @@ describe("PlayPage", () => {
 
     await screen.findByRole("heading", { name: demoGame.title });
     fireEvent.click(screen.getByRole("button", { name: /Zahraniční rock za 200/i }));
-    fireEvent.keyDown(window, { key: "Enter" });
     fireEvent.keyDown(window, { key: "Enter" });
     fireEvent.click(screen.getByRole("button", { name: "Špatně" }));
 
@@ -211,7 +203,6 @@ describe("PlayPage", () => {
     const tile = screen.getByRole("button", { name: /České hity za 100/i });
     fireEvent.click(tile);
     fireEvent.keyDown(window, { key: "Enter" });
-    fireEvent.keyDown(window, { key: "Enter" });
     fireEvent.click(screen.getByRole("button", { name: "Zpět na tabuli" }));
 
     expect(tile).toBeDisabled();
@@ -233,7 +224,6 @@ describe("PlayPage", () => {
     expect(screen.queryByText(/Finální odpověď/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^Queen$/i)).not.toBeInTheDocument();
 
-    fireEvent.keyDown(window, { key: "Enter" });
     expect(await screen.findByText(/Nápověda 1/i)).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "Enter" });
