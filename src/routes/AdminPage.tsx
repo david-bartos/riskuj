@@ -21,7 +21,7 @@ const targetKey = (target: AudioTarget) => {
 };
 
 function buildAudioTargets(game: Game): AudioTarget[] {
-  return game.rounds.flatMap((round) => {
+  return game.rounds.flatMap<AudioTarget>((round) => {
     if (round.type === "question") {
       return round.items.map((item) => {
         const category = round.categories.find(

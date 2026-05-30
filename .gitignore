@@ -3,6 +3,7 @@ dist
 data/uploads
 .env
 server/data/games/*.json
+server/data/audio-assets.json
 server/data/uploads/*
 !server/data/games/.gitkeep
 !server/data/uploads/.gitkeep
