@@ -103,14 +103,13 @@ describe("App", () => {
       screen.getByRole("heading", { name: "České hity za 100 bodů" })
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Který zpěvák proslavil píseň Jožin z bažin?")
+      screen.getByText("Který zpěvák nazpíval píseň Lady Carneval?")
     ).toBeInTheDocument();
-    expect(screen.getByText("Ukázka českého hitu")).toBeInTheDocument();
-    expect(screen.queryByText("Ivan Mládek")).not.toBeInTheDocument();
+    expect(screen.queryByText("Karel Gott")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Zobrazit odpověď" }));
 
-    expect(screen.getByText("Ivan Mládek")).toBeInTheDocument();
+    expect(screen.getByText("Karel Gott")).toBeInTheDocument();
   });
 
   it("se vrátí na tabuli bez označení otázky jako použité", () => {
@@ -130,6 +129,89 @@ describe("App", () => {
     });
 
     expect(tile).toBeEnabled();
-    expect(tile).not.toHaveClass("board-tile-used");
+    expect(tile).toHaveAttribute("data-state", "available");
+  });
+
+  it("označí otázku jako použitou po správné odpovědi a vrátí se na tabuli", () => {
+    window.history.pushState({}, "", "/play/demo");
+
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "České hity, otázka za 100 bodů"
+      })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Správně" }));
+
+    const usedTile = screen.getByRole("button", {
+      name: "Použito: České hity za 100 bodů"
+    });
+
+    expect(
+      screen.getByRole("grid", { name: "Herní tabule Hudební Riskuj" })
+    ).toBeInTheDocument();
+    expect(usedTile).toBeDisabled();
+    expect(usedTile).toHaveAttribute("data-state", "used");
+  });
+
+  it("označí otázku jako použitou po špatné odpovědi", () => {
+    window.history.pushState({}, "", "/play/demo");
+
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Zahraniční rock, otázka za 100 bodů"
+      })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Špatně" }));
+
+    expect(
+      screen.getByRole("button", {
+        name: "Použito: Zahraniční rock za 100 bodů"
+      })
+    ).toBeDisabled();
+  });
+
+  it("obnoví použitá políčka po remountu a dovolí reset tabule", () => {
+    window.history.pushState({}, "", "/play/demo");
+
+    const { unmount } = render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "České hity, otázka za 100 bodů"
+      })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Správně" }));
+
+    unmount();
+    render(<App />);
+
+    expect(
+      screen.getByRole("button", {
+        name: "Použito: České hity za 100 bodů"
+      })
+    ).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Resetovat tabuli" }));
+
+    expect(
+      screen.getByRole("button", {
+        name: "České hity, otázka za 100 bodů"
+      })
+    ).toBeEnabled();
+  });
+
+  it("zobrazí nenalezenou hru pro neznámé play ID", () => {
+    window.history.pushState({}, "", "/play/neznama");
+
+    render(<App />);
+
+    expect(
+      screen.getByRole("heading", { name: "Hra nenalezena" })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Hra "neznama" zatím není dostupná.')).toBeInTheDocument();
   });
 });
