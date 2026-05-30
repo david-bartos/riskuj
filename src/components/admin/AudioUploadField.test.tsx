@@ -95,6 +95,38 @@ describe("AudioUploadField", () => {
     expect(onChange).toHaveBeenCalledWith(undefined);
   });
 
+  it("nepřepíše pozdější výběr z knihovny dokončeným starším uploadem", async () => {
+    const libraryAsset: AudioAsset = {
+      id: "audio-library",
+      src: "/uploads/audio-library.mp3",
+      title: "library"
+    };
+    let finishUpload: (uploadedAsset: AudioAsset) => void = () => undefined;
+    const pendingUpload = new Promise<AudioAsset>((resolve) => {
+      finishUpload = resolve;
+    });
+    const onUploadAudio = vi.fn().mockReturnValue(pendingUpload);
+    const onChange = vi.fn();
+    renderField({ audioAssets: [libraryAsset], onUploadAudio, onChange });
+
+    fireEvent.change(screen.getByLabelText("Nahrát MP3 k položce"), {
+      target: { files: [new File(["ID3"], "older.mp3", { type: "audio/mpeg" })] }
+    });
+    fireEvent.change(screen.getByLabelText("Vybrat MP3 z knihovny"), {
+      target: { value: "audio-library" }
+    });
+
+    finishUpload({
+      id: "audio-old",
+      src: "/uploads/audio-old.mp3",
+      title: "older"
+    });
+
+    await waitFor(() => expect(onUploadAudio).toHaveBeenCalledTimes(1));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(libraryAsset);
+  });
+
   it("zobrazí českou chybu uploadu", async () => {
     const onUploadAudio = vi.fn().mockRejectedValue(new Error("Server spadl."));
     renderField({ onUploadAudio });
