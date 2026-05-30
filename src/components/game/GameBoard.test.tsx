@@ -1,70 +1,50 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { demoGame } from "../../data/demoGame";
 import type { Game } from "../../types/game";
 import { GameBoard } from "./GameBoard";
 
-const game: Game = {
-  id: "demo",
-  title: "Demo Riskuj",
-  categories: [
-    { id: "ceske-hity", title: "České hity" },
-    { id: "filmove-pisne", title: "Filmové písně" }
-  ],
-  questions: [
-    {
-      id: "ceske-hity-100",
-      categoryId: "ceske-hity",
-      points: 100,
-      prompt: "Který zpěvák nazpíval píseň Lady Carneval?",
-      answer: "Karel Gott"
-    },
-    {
-      id: "filmove-pisne-100",
-      categoryId: "filmove-pisne",
-      points: 100,
-      prompt: "Ve kterém filmu zazněla píseň Šíleně smutná princezna?",
-      answer: "Šíleně smutná princezna"
-    },
-    {
-      id: "ceske-hity-200",
-      categoryId: "ceske-hity",
-      points: 200,
-      prompt: "Kdo zpíval Slunečný hrob?",
-      answer: "Blue Effect"
-    },
-    {
-      id: "filmove-pisne-200",
-      categoryId: "filmove-pisne",
-      points: 200,
-      prompt: "Která pohádka má píseň Není nutno?",
-      answer: "Tři veteráni"
-    }
-  ]
-};
-
 describe("GameBoard", () => {
-  it("renders category headers and score rows derived from the game", () => {
+  it("renders category headers from the demo game", () => {
     render(
       <GameBoard
-        game={game}
+        game={demoGame}
         currentQuestionId={null}
         revealedQuestionIds={[]}
         onSelectQuestion={vi.fn()}
       />
     );
 
-    expect(screen.getByText("České hity")).toBeInTheDocument();
-    expect(screen.getByText("Filmové písně")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /100 bodů/ })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: /200 bodů/ })).toHaveLength(2);
+    for (const category of demoGame.categories) {
+      expect(screen.getByText(category.title)).toBeInTheDocument();
+    }
   });
 
-  it("selects available questions by id", () => {
+  it("keeps used demo questions visible but disabled and dimmed", () => {
+    render(
+      <GameBoard
+        game={demoGame}
+        currentQuestionId={null}
+        revealedQuestionIds={["ceske-hity-200"]}
+        onSelectQuestion={vi.fn()}
+      />
+    );
+
+    const usedTile = screen.getByRole("button", {
+      name: "Použito: České hity za 200 bodů"
+    });
+
+    expect(usedTile).toBeInTheDocument();
+    expect(usedTile).toBeDisabled();
+    expect(usedTile).toHaveAttribute("data-state", "used");
+  });
+
+  it("selects available demo questions by id", () => {
     const onSelectQuestion = vi.fn();
 
     render(
       <GameBoard
-        game={game}
+        game={demoGame}
         currentQuestionId={null}
         revealedQuestionIds={[]}
         onSelectQuestion={onSelectQuestion}
@@ -72,36 +52,18 @@ describe("GameBoard", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Filmové písně za 200 bodů" })
+      screen.getByRole("button", { name: "Zahraniční rock za 300 bodů" })
     );
 
     expect(onSelectQuestion).toHaveBeenCalledTimes(1);
-    expect(onSelectQuestion).toHaveBeenCalledWith("filmove-pisne-200");
-  });
-
-  it("marks the active question and used questions with separate states", () => {
-    render(
-      <GameBoard
-        game={game}
-        currentQuestionId="ceske-hity-100"
-        revealedQuestionIds={["filmove-pisne-200"]}
-        onSelectQuestion={vi.fn()}
-      />
-    );
-
-    expect(
-      screen.getByRole("button", { name: "Vybráno: České hity za 100 bodů" })
-    ).toHaveAttribute("data-state", "active");
-    expect(
-      screen.getByRole("button", { name: "Použito: Filmové písně za 200 bodů" })
-    ).toBeDisabled();
+    expect(onSelectQuestion).toHaveBeenCalledWith("zahranicni-rock-300");
   });
 
   it("renders sparse boards with visible disabled cells", () => {
     const sparseGame: Game = {
-      ...game,
-      questions: game.questions.filter(
-        (question) => question.id !== "filmove-pisne-200"
+      ...demoGame,
+      questions: demoGame.questions.filter(
+        (question) => question.id !== "zahranicni-rock-300"
       )
     };
 
@@ -114,12 +76,14 @@ describe("GameBoard", () => {
       />
     );
 
-    const board = screen.getByRole("grid", { name: "Herní tabule Demo Riskuj" });
+    const board = screen.getByRole("grid", {
+      name: "Herní tabule Hudební Riskuj"
+    });
 
-    expect(within(board).getAllByRole("button")).toHaveLength(4);
+    expect(within(board).getAllByRole("button")).toHaveLength(25);
     expect(
       screen.getByRole("button", {
-        name: "Filmové písně za 200 bodů není dostupné"
+        name: "Zahraniční rock za 300 bodů není dostupné"
       })
     ).toBeDisabled();
   });
