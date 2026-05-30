@@ -52,6 +52,22 @@ describe("App", () => {
 
   it("zobrazí editor hry na /admin", async () => {
     window.history.pushState({}, "", "/admin");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url === "/api/games") {
+          return Response.json([]);
+        }
+
+        if (url === "/api/audio-assets") {
+          return Response.json([]);
+        }
+
+        return new Response("not found", { status: 404 });
+      })
+    );
 
     render(<App />);
 
