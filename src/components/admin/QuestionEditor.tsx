@@ -1,89 +1,7 @@
-import { useId, useState } from "react";
 import type { AudioAsset, Game, ListeningGenre, ListeningItem, Question } from "../../types/game";
+import AudioUploadField from "./AudioUploadField";
 
 type AdminCommonDenominatorRound = NonNullable<Game["commonDenominator"]>;
-
-type AudioAttachmentProps = {
-  audio?: AudioAsset;
-  audioAssets: AudioAsset[];
-  label: string;
-  onChange: (audio: AudioAsset | undefined) => void;
-  onUploadAudio?: (file: File) => Promise<AudioAsset>;
-};
-
-function getAudioLabel(audio: AudioAsset) {
-  return audio.displayName ?? audio.title ?? audio.originalName ?? audio.src;
-}
-
-function AudioAttachmentEditor({
-  audio,
-  audioAssets,
-  label,
-  onChange,
-  onUploadAudio
-}: AudioAttachmentProps) {
-  const selectId = useId();
-  const uploadId = useId();
-  const [status, setStatus] = useState("");
-
-  async function handleUpload(file: File | undefined) {
-    if (!file || !onUploadAudio) {
-      return;
-    }
-
-    setStatus("Nahrávám MP3...");
-    try {
-      const asset = await onUploadAudio(file);
-      onChange(asset);
-      setStatus("Audio je připojené.");
-    } catch {
-      setStatus("MP3 se nepodařilo nahrát.");
-    }
-  }
-
-  return (
-    <section className="audio-attachment" aria-label={label}>
-      <div className="editor-grid">
-        <label className="field-stack" htmlFor={selectId}>
-          <span>Vybrat MP3 z knihovny</span>
-          <select
-            id={selectId}
-            value={audio?.id ?? ""}
-            onChange={(event) => {
-              const asset = audioAssets.find((candidate) => candidate.id === event.target.value);
-              onChange(asset);
-            }}
-          >
-            <option value="">Bez audia</option>
-            {audioAssets.map((asset) => (
-              <option key={asset.id} value={asset.id}>
-                {getAudioLabel(asset)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="field-stack" htmlFor={uploadId}>
-          <span>Nahrát MP3 k položce</span>
-          <input
-            accept="audio/mpeg,.mp3"
-            id={uploadId}
-            type="file"
-            onChange={(event) => void handleUpload(event.target.files?.[0])}
-          />
-        </label>
-      </div>
-
-      {audio ? (
-        <div className="audio-preview" aria-label="Aktuální audio">
-          <span>Aktuální audio: {getAudioLabel(audio)}</span>
-          <audio aria-label="Náhled audio ukázky" controls src={audio.src} />
-        </div>
-      ) : null}
-      {status ? <p role="status">{status}</p> : null}
-    </section>
-  );
-}
 
 type FirstRoundQuestionEditorProps = {
   question: Question;
@@ -128,7 +46,7 @@ export function FirstRoundQuestionEditor({
           }
         />
       </label>
-      <AudioAttachmentEditor
+      <AudioUploadField
         audio={question.audio}
         audioAssets={audioAssets}
         label={`Audio otázky ${suffix}`}
@@ -207,7 +125,7 @@ export function ListeningItemEditor({
           onChange={(event) => onChange({ ...item, answer: event.target.value })}
         />
       </label>
-      <AudioAttachmentEditor
+      <AudioUploadField
         audio={item.audio}
         audioAssets={audioAssets}
         label="Audio poslechové položky"
@@ -263,7 +181,7 @@ export function CommonDenominatorEditor({
                 }
               />
             </label>
-            <AudioAttachmentEditor
+            <AudioUploadField
               audio={clue.audio}
               audioAssets={audioAssets}
               label={`Audio indicie ${index + 1}`}

@@ -33,8 +33,7 @@ export default function QuestionScreen({
       {question.audio ? (
         <section className="question-screen__audio" aria-label="Hudební ukázka">
           <p className="stage-label">Audio</p>
-          <h2>{question.audio.title}</h2>
-          <audio controls src={question.audio.src}>
+          <audio aria-label="Přehrát audio ukázku" controls src={question.audio.src}>
             Váš prohlížeč nepodporuje přehrávání audia.
           </audio>
         </section>

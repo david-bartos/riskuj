@@ -95,6 +95,31 @@ export async function uploadAudioAsset(file: File, title?: string): Promise<Audi
   });
 }
 
+export async function uploadAudio(file: File): Promise<AudioAsset> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  let response: Response;
+  try {
+    response = await fetch("/api/uploads/audio", {
+      method: "POST",
+      body: formData
+    });
+  } catch {
+    throw new GamesClientError(
+      "Audio se nepodařilo nahrát. Zkontrolujte připojení a zkuste to znovu."
+    );
+  }
+
+  const body = await readJsonResponse<unknown>(response);
+
+  if (!response.ok) {
+    throw createUploadError(response, body);
+  }
+
+  return body as AudioAsset;
+}
+
 export const gamesClient = {
   listGames,
   loadGame,
@@ -102,6 +127,7 @@ export const gamesClient = {
   saveGame,
   listAudioAssets,
   uploadAudioAsset,
+  uploadAudio,
 };
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -144,12 +170,35 @@ function createHttpError(response: Response, body: unknown) {
   return new GamesClientError("Požadavek na hry selhal.", response.status);
 }
 
+function createUploadError(response: Response, body: unknown) {
+  if (isBackendError(body)) {
+    if (body.error === "Only MP3 audio uploads are supported.") {
+      return new GamesClientError("Nahrajte prosím soubor MP3.", response.status);
+    }
+
+    if (body.error === 'MP3 file is required in multipart field "file".') {
+      return new GamesClientError("Vyberte prosím MP3 soubor k nahrání.", response.status);
+    }
+  }
+
+  return new GamesClientError("Audio se nepodařilo nahrát. Zkuste to prosím znovu.", response.status);
+}
+
 function isErrorBody(value: unknown): value is { message: string; details?: unknown } {
   return (
     typeof value === "object" &&
     value !== null &&
     "message" in value &&
     typeof value.message === "string"
+  );
+}
+
+function isBackendError(value: unknown): value is { error: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "error" in value &&
+    typeof value.error === "string"
   );
 }
 

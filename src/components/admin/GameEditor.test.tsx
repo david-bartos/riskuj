@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import GameEditor from "./GameEditor";
+import GameEditor, { normalizeGame, prepareGameForSave } from "./GameEditor";
 import type { Game } from "../../types/game";
 
 const gameFixture: Game = {
@@ -69,5 +69,53 @@ describe("GameEditor", () => {
 
     expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByText("Název hry nesmí být prázdný.")).toBeInTheDocument();
+  });
+
+  it("uloží audio prvního kola do canonical rounds", () => {
+    const audio = { id: "audio-question", src: "/uploads/question.mp3", title: "Question" };
+    const savedGame = prepareGameForSave(
+      normalizeGame({
+        ...gameFixture,
+        questions: [{ ...gameFixture.questions[0], audio }]
+      })
+    );
+
+    const questionRound = savedGame.rounds.find((round) => round.type === "question");
+
+    expect(questionRound?.questions[0].audio).toEqual(audio);
+    expect(questionRound?.questions[0].audio?.src).toBe("/uploads/question.mp3");
+  });
+
+  it("uloží audio poslechové položky do tracks v canonical rounds", () => {
+    const audio = { id: "audio-track", src: "/uploads/track.mp3", title: "Track" };
+    const savedGame = prepareGameForSave(
+      normalizeGame({
+        ...gameFixture,
+        listeningItems: [{ ...gameFixture.listeningItems![0], audio }]
+      })
+    );
+
+    const listeningRound = savedGame.rounds.find((round) => round.type === "listening");
+
+    expect(listeningRound?.tracks[0].audio).toEqual(audio);
+    expect(listeningRound?.tracks[0].audioUrl).toBe("/uploads/track.mp3");
+  });
+
+  it("uloží audio indicie do třetího kola v canonical rounds", () => {
+    const audio = { id: "audio-clue", src: "/uploads/clue.mp3", title: "Clue" };
+    const savedGame = prepareGameForSave(
+      normalizeGame({
+        ...gameFixture,
+        commonDenominator: {
+          answer: "Společná odpověď",
+          clues: [{ ...gameFixture.commonDenominator!.clues[0], audio }]
+        }
+      })
+    );
+
+    const commonRound = savedGame.rounds.find((round) => round.type === "common-denominator");
+
+    expect(commonRound?.clues[0].audio).toEqual(audio);
+    expect(commonRound?.clues[0].audio?.src).toBe("/uploads/clue.mp3");
   });
 });
