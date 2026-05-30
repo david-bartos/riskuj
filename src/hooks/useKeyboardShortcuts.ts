@@ -47,7 +47,10 @@ export function useKeyboardShortcuts({
       }
 
       if (event.key === " " || event.key === "Space") {
-        onToggleAudio?.();
+        if (onToggleAudio) {
+          event.preventDefault();
+          onToggleAudio();
+        }
         return;
       }
 

@@ -64,6 +64,24 @@ describe("useKeyboardShortcuts", () => {
     expect(onRevealAnswer).toHaveBeenCalledTimes(1);
   });
 
+  it("prevents default browser behavior when handling the space shortcut", () => {
+    const onToggleAudio = vi.fn();
+
+    render(<TestShortcuts onToggleAudio={onToggleAudio} />);
+
+    const event = new KeyboardEvent("keydown", {
+      key: " ",
+      bubbles: true,
+      cancelable: true
+    });
+
+    const wasNotCanceled = window.dispatchEvent(event);
+
+    expect(onToggleAudio).toHaveBeenCalledTimes(1);
+    expect(wasNotCanceled).toBe(false);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
   it("does not dispatch shortcuts when disabled", () => {
     const onBackToBoard = vi.fn();
     const onToggleAudio = vi.fn();
