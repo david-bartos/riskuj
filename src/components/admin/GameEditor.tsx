@@ -24,6 +24,7 @@ import {
 import TeamSetup from "../game/TeamSetup";
 
 const questionPoints: QuestionPoints[] = [100, 200, 300, 400, 500];
+const roundTypeOrder: RoundType[] = ["question", "listening", "common-denominator"];
 
 function createDefaultTeams() {
   return Array.from({ length: 6 }, (_, index) => ({
@@ -151,22 +152,15 @@ export function prepareGameForSave(game: EditableGame): Game {
   }
 
   if (roundTypes.includes("listening")) {
+    const listeningItems = normalizeListeningItems(game);
+
     rounds.push({
       id: listeningRound?.id ?? "round-poslech",
       type: "listening" as const,
       title: listeningRound?.title ?? "Poslechové kolo",
       categories: game.listeningGenres,
-      tracks: game.listeningItems.map((item) => ({
-        ...item,
-        categoryId: item.categoryId ?? item.genreId ?? game.listeningGenres[0]?.id ?? "",
-        genreId: item.genreId ?? item.categoryId,
-        points: item.points ?? 100,
-        trackTitleAnswer: item.trackTitleAnswer ?? item.title ?? item.answer,
-        artistAnswer: item.artistAnswer ?? item.artist ?? "",
-        audioUrl: item.audio?.src ?? item.audioUrl,
-        scoring: { artist: 1000, title: 3000, both: 5000 }
-      })),
-      items: game.listeningItems
+      tracks: listeningItems,
+      items: listeningItems
     });
   }
 
@@ -388,21 +382,39 @@ export default function GameEditor({
 
   function addRound() {
     setGame((current) => {
-      if (current.rounds.length > 0) {
+      const existingTypes = new Set(current.rounds.map((round) => round.type));
+      const nextType = roundTypeOrder.find((type) => !existingTypes.has(type));
+
+      if (!nextType) {
         return current;
       }
 
       return {
         ...current,
-        rounds: [{ id: makeId("round"), type: "question", title: "Otázkové kolo", categories: [], questions: [] }]
+        rounds: [...current.rounds, createRoundShell(nextType, current, makeId("round"))]
       };
     });
   }
 
-  function changePrimaryRoundType(type: RoundType) {
+  function changeRoundType(roundId: string, type: RoundType) {
+    setGame((current) => {
+      if (current.rounds.some((round) => round.id !== roundId && round.type === type)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        rounds: current.rounds.map((round) =>
+          round.id === roundId ? createRoundShell(type, current, round.id) : round
+        )
+      };
+    });
+  }
+
+  function removeRound(roundId: string) {
     setGame((current) => ({
       ...current,
-      rounds: [createRoundShell(type, current)]
+      rounds: current.rounds.filter((round) => round.id !== roundId)
     }));
   }
 
@@ -491,19 +503,37 @@ export default function GameEditor({
             Přidat kolo
           </button>
         </div>
-        {game.rounds[0] ? (
-          <label className="field-stack">
-            <span>Typ kola</span>
-            <select
-              value={game.rounds[0].type}
-              onChange={(event) => changePrimaryRoundType(event.target.value as RoundType)}
+        {game.rounds.map((round, index) => (
+          <div className="inline-actions" key={round.id}>
+            <label className="field-stack">
+              <span>Typ kola</span>
+              <select
+                value={round.type}
+                onChange={(event) => changeRoundType(round.id, event.target.value as RoundType)}
+              >
+                {roundTypeOrder.map((type) => (
+                  <option
+                    disabled={game.rounds.some(
+                      (candidate) => candidate.id !== round.id && candidate.type === type
+                    )}
+                    key={type}
+                    value={type}
+                  >
+                    {roundTypeLabel(type)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              aria-label={`Odebrat kolo ${index + 1}`}
+              className="button-compact"
+              type="button"
+              onClick={() => removeRound(round.id)}
             >
-              <option value="question">Otázkové kolo</option>
-              <option value="listening">Poslechové kolo</option>
-              <option value="common-denominator">Společný jmenovatel</option>
-            </select>
-          </label>
-        ) : null}
+              Odebrat
+            </button>
+          </div>
+        ))}
       </section>
 
       <section className="editor-section">
@@ -786,10 +816,23 @@ export default function GameEditor({
 
 export { GameEditor };
 
-function createRoundShell(type: RoundType, game: EditableGame): Game["rounds"][number] {
+function normalizeListeningItems(game: EditableGame): ListeningItem[] {
+  return game.listeningItems.map((item) => ({
+    ...item,
+    categoryId: item.categoryId ?? item.genreId ?? game.listeningGenres[0]?.id ?? "",
+    genreId: item.genreId ?? item.categoryId,
+    points: item.points ?? 100,
+    trackTitleAnswer: item.trackTitleAnswer ?? item.title ?? item.trackTitle ?? item.answer,
+    artistAnswer: item.artistAnswer ?? item.artist ?? "",
+    audioUrl: item.audio?.src ?? item.audioUrl,
+    scoring: { artist: 1000, title: 3000, both: 5000 }
+  }));
+}
+
+function createRoundShell(type: RoundType, game: EditableGame, id: string): Game["rounds"][number] {
   if (type === "listening") {
     return {
-      id: game.rounds[0]?.id ?? makeId("round"),
+      id,
       type,
       title: "Poslechové kolo",
       categories: game.listeningGenres,
@@ -799,7 +842,7 @@ function createRoundShell(type: RoundType, game: EditableGame): Game["rounds"][n
 
   if (type === "common-denominator") {
     return {
-      id: game.rounds[0]?.id ?? makeId("round"),
+      id,
       type,
       title: "Společný jmenovatel",
       points: 300,
@@ -810,13 +853,25 @@ function createRoundShell(type: RoundType, game: EditableGame): Game["rounds"][n
   }
 
   return {
-    id: game.rounds[0]?.id ?? makeId("round"),
+    id,
     type,
     title: "Otázkové kolo",
     categories: game.categories,
     questions: game.questions,
     items: game.questions
   };
+}
+
+function roundTypeLabel(type: RoundType) {
+  if (type === "listening") {
+    return "Poslechové kolo";
+  }
+
+  if (type === "common-denominator") {
+    return "Společný jmenovatel";
+  }
+
+  return "Otázkové kolo";
 }
 
 function slugify(value: string) {

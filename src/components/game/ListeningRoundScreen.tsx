@@ -7,7 +7,7 @@ type ListeningRoundScreenProps = {
 
 export function ListeningRoundScreen({ item, answerVisible }: ListeningRoundScreenProps) {
   const artist = item.artistAnswer ?? item.artist ?? "Nezadáno";
-  const trackTitle = item.trackTitleAnswer ?? item.trackTitle ?? "Nezadáno";
+  const trackTitle = item.trackTitleAnswer ?? item.trackTitle ?? item.title ?? "Nezadáno";
 
   return (
     <>

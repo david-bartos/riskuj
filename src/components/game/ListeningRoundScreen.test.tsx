@@ -41,6 +41,22 @@ describe("ListeningRoundScreen", () => {
     expect(screen.getByText("Název: Bohemian Rhapsody")).toBeInTheDocument();
   });
 
+  it("po odkrytí použije název skladby z title u raw admin položky", () => {
+    render(
+      <ListeningRoundScreen
+        item={{
+          ...item,
+          title: "Měls mě vůbec rád",
+          trackTitle: undefined,
+          trackTitleAnswer: undefined
+        }}
+        answerVisible
+      />
+    );
+
+    expect(screen.getByText("Název: Měls mě vůbec rád")).toBeInTheDocument();
+  });
+
   it("nespadne bez MP3", () => {
     render(<ListeningRoundScreen item={{ ...item, audio: undefined }} answerVisible={false} />);
 
