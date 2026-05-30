@@ -40,16 +40,16 @@ describe("gameJson", () => {
 
   it("odmítne duplicitní ID otázky v prvním kole", () => {
     const game = makeGame({
-      questions: [demoGame.questions[0], demoGame.questions[1]],
+      questions: [demoGame.questions![0], demoGame.questions![1]],
       rounds: [
         {
           id: "round-otazky",
           type: "question",
           title: "Riskuj",
-          categories: demoGame.categories,
+          categories: demoGame.categories!,
           questions: [
-            { ...demoGame.questions[0], id: "duplicitni-otazka" },
-            { ...demoGame.questions[1], id: "duplicitni-otazka" }
+            { ...demoGame.questions![0], id: "duplicitni-otazka" },
+            { ...demoGame.questions![1], id: "duplicitni-otazka" }
           ]
         }
       ]
@@ -69,7 +69,7 @@ describe("gameJson", () => {
     const game = makeGame({
       questions: [
         {
-          ...demoGame.questions[0],
+          ...demoGame.questions![0],
           audio: { id: "audio-bad", src: "file:///tmp/song.mp3", title: "Bad" }
         }
       ]

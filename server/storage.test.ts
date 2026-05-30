@@ -117,7 +117,7 @@ describe("game storage", () => {
     const invalidGame = createValidGame({
       questions: [
         {
-          ...createValidGame().questions[0],
+          ...createValidGame().questions![0],
           answer: undefined as unknown as string,
         },
       ],
@@ -151,7 +151,7 @@ describe("game storage", () => {
     const invalidGame = createValidGame({
       questions: [
         {
-          ...createValidGame().questions[0],
+          ...createValidGame().questions![0],
           moderatorNote: 42 as unknown as string,
           audio: {
             id: "audio-1",

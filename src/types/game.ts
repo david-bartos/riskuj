@@ -102,6 +102,8 @@ export interface CommonDenominatorItem {
   answer: string;
   value: Exclude<MoneyValue, 0>;
   hint?: string;
+  explanation?: string;
+  audioHint?: AudioAsset;
   moderatorNote?: string;
   reviewStatus?: ReviewStatus;
   knownIssueIds?: string[];
@@ -149,11 +151,11 @@ export interface Game {
   teams: Team[];
   rounds: Round[];
   /** Existing persistence/editor metadata. */
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
   /** Legacy projection used by editor modules until they fully migrate to rounds. */
-  categories: Category[];
-  questions: Question[];
+  categories?: Category[];
+  questions?: Question[];
   listeningGenres?: ListeningGenre[];
   listeningItems?: ListeningItem[];
   commonDenominator?: {
