@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { demoGame } from "./demoGame";
 
@@ -32,7 +34,10 @@ describe("demoGame", () => {
     expect(audioAssets.length).toBeGreaterThan(0);
 
     for (const audio of audioAssets) {
-      expect(audio.src).toMatch(/^\/uploads\/.+\.mp3$/);
+      expect(audio.src).toMatch(/^\/demo-audio\/.+\.mp3$/);
+      expect(existsSync(path.join(process.cwd(), "public", audio.src))).toBe(
+        true
+      );
       expect(audio.mimeType).toBe("audio/mpeg");
       expect(audio.originalName.trim()).not.toEqual("");
       expect(JSON.stringify(audio).toLowerCase()).not.toContain("queen");

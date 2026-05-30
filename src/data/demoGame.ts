@@ -6,7 +6,7 @@ const audio = (
   displayName: string
 ): AudioAsset => ({
   id,
-  src: `/uploads/${fileName}`,
+  src: `/demo-audio/${fileName}`,
   originalName: fileName,
   displayName,
   mimeType: "audio/mpeg"
