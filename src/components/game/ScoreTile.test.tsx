@@ -26,7 +26,7 @@ describe("ScoreTile", () => {
     );
 
     const tile = screen.getByRole("button", {
-      name: "České hity za 100 bodů"
+      name: "České hity, otázka za 100 bodů"
     });
 
     expect(tile).toHaveTextContent("100");
@@ -52,7 +52,7 @@ describe("ScoreTile", () => {
     );
 
     const tile = screen.getByRole("button", {
-      name: "Vybráno: České hity za 100 bodů"
+      name: "Vybráno: České hity, otázka za 100 bodů"
     });
 
     expect(tile).toHaveAttribute("aria-pressed", "true");

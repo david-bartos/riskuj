@@ -19,14 +19,15 @@ export function ScoreTile({
 }: ScoreTileProps) {
   const isDisabled = state === "used" || state === "disabled" || !question;
   const isActive = state === "active";
+  const availableLabel = `${categoryTitle}, otázka za ${points} bodů`;
   const label =
     state === "active"
-      ? `Vybráno: ${categoryTitle} za ${points} bodů`
+      ? `Vybráno: ${categoryTitle}, otázka za ${points} bodů`
       : state === "used"
         ? `Použito: ${categoryTitle} za ${points} bodů`
         : state === "disabled"
           ? `${categoryTitle} za ${points} bodů není dostupné`
-          : `${categoryTitle} za ${points} bodů`;
+          : availableLabel;
 
   return (
     <button
