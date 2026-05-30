@@ -159,6 +159,10 @@ export default function PlayPage({ gameId }: PlayPageProps) {
   );
 
   function selectTarget(target: SelectedTarget) {
+    if (completedIds.includes(selectedId(target))) {
+      return;
+    }
+
     setSelected(target);
     setPhase("board");
   }
@@ -233,10 +237,12 @@ export default function PlayPage({ gameId }: PlayPageProps) {
                             itemId: item.id
                           };
                           const id = selectedId(target);
+                          const isCompleted = completedIds.includes(id);
                           return (
                             <button
-                              aria-disabled={completedIds.includes(id)}
+                              aria-disabled={isCompleted}
                               className="tile-button"
+                              disabled={isCompleted}
                               key={item.id}
                               onClick={() => selectTarget(target)}
                               type="button"
@@ -264,10 +270,12 @@ export default function PlayPage({ gameId }: PlayPageProps) {
                       itemId: item.id
                     };
                     const id = selectedId(target);
+                    const isCompleted = completedIds.includes(id);
                     return (
                       <button
-                        aria-disabled={completedIds.includes(id)}
+                        aria-disabled={isCompleted}
                         className="tile-button"
+                        disabled={isCompleted}
                         key={item.id}
                         onClick={() => selectTarget(target)}
                         type="button"
@@ -289,6 +297,9 @@ export default function PlayPage({ gameId }: PlayPageProps) {
                   selectedId({ kind: "common-denominator", roundId: round.id })
                 )}
                 className="tile-button"
+                disabled={completedIds.includes(
+                  selectedId({ kind: "common-denominator", roundId: round.id })
+                )}
                 onClick={() =>
                   selectTarget({
                     kind: "common-denominator",

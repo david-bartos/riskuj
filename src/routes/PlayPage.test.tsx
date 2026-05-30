@@ -97,6 +97,24 @@ describe("PlayPage", () => {
     expect(within(scoreboard).getByText("100")).toBeInTheDocument();
   });
 
+  it("neumožní znovu vybrat dokončenou položku z tabule", async () => {
+    render(<PlayPage gameId="demo-hudebni-riskuj" />);
+
+    await screen.findByRole("heading", { name: demoGame.title });
+    const tile = screen.getByRole("button", { name: /Český pop za 100/i });
+    fireEvent.click(tile);
+    fireEvent.keyDown(window, { key: "Enter" });
+    fireEvent.keyDown(window, { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: "Zpět na tabuli" }));
+
+    expect(tile).toBeDisabled();
+
+    fireEvent.click(tile);
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    expect(screen.queryByText(/Která zpěvačka/i)).not.toBeInTheDocument();
+  });
+
   it("odhaluje nápovědy společného jmenovatele a finální odpověď až ve fázi odpovědi", async () => {
     render(<PlayPage gameId="demo-hudebni-riskuj" />);
 
