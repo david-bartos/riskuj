@@ -11,7 +11,7 @@ type TeamScoreboardProps = {
 };
 
 function formatScore(score: number) {
-  return `${new Intl.NumberFormat("cs-CZ").format(score)} Kč`;
+  return `${new Intl.NumberFormat("cs-CZ").format(score).replace(/\u00a0/g, " ")} Kč`;
 }
 
 function scoreForTeam(scores: TeamSessionScore[], teamId: string) {

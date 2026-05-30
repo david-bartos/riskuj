@@ -1,95 +1,75 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { gamesClient } from "../api/gamesClient";
 import { playSfx, type SfxName } from "../audio/sfx";
+import TeamScoreboard from "../components/game/TeamScoreboard";
 import { useFullscreen } from "../hooks/useFullscreen";
+import { usePresenterFlow } from "../hooks/usePresenterFlow";
 import type {
+  CommonDenominatorItem,
   CommonDenominatorRound,
   Game,
   ListeningItem,
   ListeningRound,
   QuestionItem,
-  QuestionRound
+  QuestionRound,
+  RoundType
 } from "../types/game";
-
-type Phase = "board" | "prompt" | "answer";
-
-type SelectedTarget =
-  | { kind: "question"; roundId: string; itemId: string }
-  | { kind: "listening"; roundId: string; itemId: string }
-  | { kind: "common-denominator"; roundId: string };
-
-type SelectedContent =
-  | {
-      kind: "question";
-      round: QuestionRound;
-      item: QuestionItem;
-      points: number;
-    }
-  | {
-      kind: "listening";
-      round: ListeningRound;
-      item: ListeningItem;
-      points: number;
-    }
-  | {
-      kind: "common-denominator";
-      round: CommonDenominatorRound;
-      points: number;
-    };
+import { listeningScoreOptions } from "../types/game";
 
 type PlayPageProps = {
   gameId: string;
 };
 
-function selectedId(target: SelectedTarget) {
-  if (target.kind === "common-denominator") {
-    return `${target.kind}:${target.roundId}`;
-  }
+type ActiveContent =
+  | { type: "question"; round: QuestionRound; item: QuestionItem }
+  | { type: "listening"; round: ListeningRound; item: ListeningItem }
+  | { type: "common-denominator"; round: CommonDenominatorRound; item: CommonDenominatorItem };
 
-  return `${target.kind}:${target.roundId}:${target.itemId}`;
+function formatMoney(value: number) {
+  return `${new Intl.NumberFormat("cs-CZ").format(value).replace(/\u00a0/g, " ")} Kč`;
 }
 
 function questionItems(round: QuestionRound) {
-  return round.questions.length > 0 ? round.questions : round.items ?? [];
+  return round.items ?? round.questions;
 }
 
 function listeningItems(round: ListeningRound) {
-  return round.tracks.length > 0 ? round.tracks : round.items ?? [];
+  return round.items ?? round.tracks;
 }
 
-function listeningAnswerTitle(item: ListeningItem) {
-  return item.trackTitleAnswer ?? item.title ?? item.answer;
+function commonItems(round: CommonDenominatorRound) {
+  return (
+    round.items ?? [
+      {
+        id: round.id,
+        title: round.title,
+        clues: round.clues,
+        answer: round.answer,
+        value: (round.points ?? 0) as CommonDenominatorItem["value"]
+      }
+    ]
+  );
 }
 
-function listeningAnswerArtist(item: ListeningItem) {
-  return item.artistAnswer ?? item.artist ?? "";
-}
-
-function findSelectedContent(
-  game: Game | null,
-  selected: SelectedTarget | null
-): SelectedContent | null {
-  if (!game || !selected) {
+function getActiveContent(game: Game, roundId?: string, itemId?: string): ActiveContent | null {
+  if (!roundId || !itemId) {
     return null;
   }
 
-  const round = game.rounds.find((candidate) => candidate.id === selected.roundId);
-  if (!round) {
-    return null;
+  const round = game.rounds.find((candidate) => candidate.id === roundId);
+  if (round?.type === "question") {
+    const item = questionItems(round).find((candidate) => candidate.id === itemId);
+    return item ? { type: "question", round, item } : null;
   }
 
-  if (selected.kind === "question" && round.type === "question") {
-    const item = questionItems(round).find((candidate) => candidate.id === selected.itemId);
-    return item ? { kind: "question", round, item, points: item.points } : null;
+  if (round?.type === "listening") {
+    const item = listeningItems(round).find((candidate) => candidate.id === itemId);
+    return item ? { type: "listening", round, item } : null;
   }
 
-  if (selected.kind === "listening" && round.type === "listening") {
-    const item = listeningItems(round).find((candidate) => candidate.id === selected.itemId);
-    return item ? { kind: "listening", round, item, points: item.points ?? 0 } : null;
-  }
-
-  if (selected.kind === "common-denominator" && round.type === "common-denominator") {
-    return { kind: "common-denominator", round, points: round.points ?? 0 };
+  if (round?.type === "common-denominator") {
+    const item = commonItems(round).find((candidate) => candidate.id === itemId);
+    return item ? { type: "common-denominator", round, item } : null;
   }
 
   return null;
@@ -99,76 +79,32 @@ function AudioPlayer({ src }: { src: string }) {
   return <audio aria-label="Přehrát audio ukázku" controls src={src} />;
 }
 
-export function PlayPage({ gameId }: PlayPageProps) {
+function PresenterView({ game }: { game: Game }) {
   const presenterRef = useRef<HTMLElement>(null);
   const { isFullscreen, isSupported, toggleFullscreen } = useFullscreen(presenterRef);
-  const [game, setGame] = useState<Game | null>(null);
-  const [error, setError] = useState("");
-  const [selected, setSelected] = useState<SelectedTarget | null>(null);
-  const [phase, setPhase] = useState<Phase>("board");
-  const [completedIds, setCompletedIds] = useState<string[]>([]);
-  const [scores, setScores] = useState<Record<string, number>>({});
-  const [activeTeamId, setActiveTeamId] = useState("");
+  const flow = usePresenterFlow(game);
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadGame() {
-      try {
-        setError("");
-        const loadedGame = await gamesClient.loadGame(gameId);
-        if (!isMounted) {
-          return;
-        }
-
-        setGame(loadedGame);
-        setScores(Object.fromEntries(loadedGame.teams.map((team) => [team.id, 0])));
-        setActiveTeamId(loadedGame.teams[0]?.id ?? "");
-        setSelected(null);
-        setPhase("board");
-        setCompletedIds([]);
-      } catch {
-        if (isMounted) {
-          setError("Hru se nepodařilo načíst.");
-        }
-      }
-    }
-
-    void loadGame();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [gameId]);
+  const activeContent = useMemo(
+    () =>
+      getActiveContent(
+        game,
+        flow.session.activeItem?.roundId,
+        flow.session.activeItem?.itemId
+      ),
+    [flow.session.activeItem, game]
+  );
 
   useEffect(() => {
     function handleEnter(event: KeyboardEvent) {
-      if (event.key !== "Enter" || !selected) {
-        return;
+      if (event.key === "Enter") {
+        flow.advance();
       }
-
-      setPhase((currentPhase) => {
-        if (currentPhase === "board") {
-          return "prompt";
-        }
-
-        if (currentPhase === "prompt") {
-          return "answer";
-        }
-
-        return currentPhase;
-      });
     }
 
     window.addEventListener("keydown", handleEnter);
     return () => window.removeEventListener("keydown", handleEnter);
-  }, [selected]);
-
-  const selectedContent = useMemo(
-    () => findSelectedContent(game, selected),
-    [game, selected]
-  );
+  }, [flow]);
 
   function playPresenterSfx(name: SfxName) {
     if (isSoundEnabled) {
@@ -176,57 +112,23 @@ export function PlayPage({ gameId }: PlayPageProps) {
     }
   }
 
-  function selectTarget(target: SelectedTarget) {
-    if (completedIds.includes(selectedId(target))) {
+  function selectItem(roundId: string, roundType: RoundType, itemId: string) {
+    if (flow.session.completedItemIds.includes(itemId)) {
       return;
     }
 
-    setSelected(target);
-    setPhase("prompt");
+    flow.selectItem(roundId, roundType, itemId);
     playPresenterSfx("open");
   }
 
-  function scoreSelected(direction: 1 | -1) {
-    if (!selectedContent || !activeTeamId) {
-      return;
-    }
-
-    setScores((currentScores) => ({
-      ...currentScores,
-      [activeTeamId]: (currentScores[activeTeamId] ?? 0) + selectedContent.points * direction
-    }));
+  function markCorrect() {
+    flow.markQuestionCorrect();
+    playPresenterSfx("correct");
   }
 
-  function completeSelected(direction: 1 | -1, sfxName: Extract<SfxName, "correct" | "wrong">) {
-    scoreSelected(direction);
-    playPresenterSfx(sfxName);
-    returnToBoard();
-  }
-
-  function returnToBoard() {
-    if (selected) {
-      setCompletedIds((currentIds) => [...new Set([...currentIds, selectedId(selected)])]);
-    }
-
-    setSelected(null);
-    setPhase("board");
-  }
-
-  if (error) {
-    return (
-      <section className="page-panel page-panel-wide play-page" aria-labelledby="play-title">
-        <h1 id="play-title">Hra nenalezena</h1>
-        <p className="page-copy">{error}</p>
-      </section>
-    );
-  }
-
-  if (!game) {
-    return (
-      <section className="page-panel page-panel-wide play-page" aria-labelledby="play-title">
-        <h1 id="play-title">Načítám hru</h1>
-      </section>
-    );
+  function markWrong() {
+    flow.markQuestionWrong();
+    playPresenterSfx("wrong");
   }
 
   return (
@@ -241,14 +143,13 @@ export function PlayPage({ gameId }: PlayPageProps) {
           <p className="stage-label">Projektorový režim</p>
           <h1 id="play-title">{game.title}</h1>
         </div>
-        <section className="scoreboard" aria-label="Skóre týmů" role="region">
-          {game.teams.map((team) => (
-            <div key={team.id} className="scoreboard-team">
-              <span>{team.name}</span>
-              <strong>{scores[team.id] ?? 0}</strong>
-            </div>
-          ))}
-        </section>
+        <TeamScoreboard
+          teams={game.teams}
+          scores={flow.session.teamScores}
+          activeTeamId={flow.session.activeTeamId}
+          onSelectTeam={flow.selectTeam}
+          onAdjustScore={flow.adjustScore}
+        />
         <div className="presenter-controls" aria-label="Ovládání prezentace">
           <button
             className="presenter-control-button"
@@ -281,23 +182,17 @@ export function PlayPage({ gameId }: PlayPageProps) {
                       {questionItems(round)
                         .filter((item) => item.categoryId === category.id)
                         .map((item) => {
-                          const target: SelectedTarget = {
-                            kind: "question",
-                            roundId: round.id,
-                            itemId: item.id
-                          };
-                          const id = selectedId(target);
-                          const isCompleted = completedIds.includes(id);
+                          const isCompleted = flow.session.completedItemIds.includes(item.id);
                           return (
                             <button
                               aria-disabled={isCompleted}
                               className="tile-button"
                               disabled={isCompleted}
                               key={item.id}
-                              onClick={() => selectTarget(target)}
+                              onClick={() => selectItem(round.id, round.type, item.id)}
                               type="button"
                             >
-                              {category.title} za {item.points}
+                              {category.title} za {formatMoney(item.value ?? item.points)}
                             </button>
                           );
                         })}
@@ -314,23 +209,20 @@ export function PlayPage({ gameId }: PlayPageProps) {
                 <h2>{round.title}</h2>
                 <div className="question-grid">
                   {listeningItems(round).map((item) => {
-                    const target: SelectedTarget = {
-                      kind: "listening",
-                      roundId: round.id,
-                      itemId: item.id
-                    };
-                    const id = selectedId(target);
-                    const isCompleted = completedIds.includes(id);
+                    const genre = (round.genres ?? round.categories).find(
+                      (candidate) => candidate.id === (item.genreId ?? item.categoryId)
+                    );
+                    const isCompleted = flow.session.completedItemIds.includes(item.id);
                     return (
                       <button
                         aria-disabled={isCompleted}
                         className="tile-button"
                         disabled={isCompleted}
                         key={item.id}
-                        onClick={() => selectTarget(target)}
+                        onClick={() => selectItem(round.id, round.type, item.id)}
                         type="button"
                       >
-                        Poslech za {item.points ?? 0}
+                        {genre?.title ?? "Poslech"}: poslech
                       </button>
                     );
                   })}
@@ -339,123 +231,199 @@ export function PlayPage({ gameId }: PlayPageProps) {
             );
           }
 
-          const target: SelectedTarget = { kind: "common-denominator", roundId: round.id };
-          const isCompleted = completedIds.includes(selectedId(target));
-
           return (
             <section className="round-section" key={round.id}>
               <h2>{round.title}</h2>
-              <button
-                aria-disabled={isCompleted}
-                className="tile-button"
-                disabled={isCompleted}
-                onClick={() => selectTarget(target)}
-                type="button"
-              >
-                Společný jmenovatel za {round.points ?? 0}
-              </button>
+              <div className="question-grid">
+                {commonItems(round).map((item) => {
+                  const isCompleted = flow.session.completedItemIds.includes(item.id);
+                  return (
+                    <button
+                      aria-disabled={isCompleted}
+                      className="tile-button"
+                      disabled={isCompleted}
+                      key={item.id}
+                      onClick={() => selectItem(round.id, round.type, item.id)}
+                      type="button"
+                    >
+                      {item.title} za {formatMoney(item.value)}
+                    </button>
+                  );
+                })}
+              </div>
             </section>
           );
         })}
       </div>
 
-      {selectedContent && phase !== "board" && (
+      {activeContent ? (
         <section className="presenter-panel" aria-label="Vybraná položka">
-          {selectedContent.kind === "question" && (
+          {flow.session.presenterStep === "item-selected" ? (
+            <p className="stage-label">Dlaždice je vybraná</p>
+          ) : null}
+
+          {activeContent.type === "question" &&
+          flow.session.presenterStep !== "item-selected" ? (
             <>
-              <h2>Otázka za {selectedContent.item.points}</h2>
-              <p>{selectedContent.item.prompt}</p>
-              {selectedContent.item.audio ? (
-                <AudioPlayer src={selectedContent.item.audio.src} />
-              ) : null}
-              {phase === "answer" ? (
+              <h2>Otázka za {formatMoney(activeContent.item.value ?? activeContent.item.points)}</h2>
+              <p>{activeContent.item.prompt}</p>
+              {activeContent.item.audio ? <AudioPlayer src={activeContent.item.audio.src} /> : null}
+              {flow.answerVisible ? (
                 <div className="answer-panel">
                   <h3>Odpověď</h3>
-                  <p>{selectedContent.item.answer}</p>
-                  {selectedContent.item.moderatorNote ? (
-                    <p>{selectedContent.item.moderatorNote}</p>
-                  ) : null}
+                  <p>{activeContent.item.answer}</p>
+                  {activeContent.item.moderatorNote ? <p>{activeContent.item.moderatorNote}</p> : null}
                 </div>
               ) : null}
             </>
-          )}
+          ) : null}
 
-          {selectedContent.kind === "listening" && (
+          {activeContent.type === "listening" &&
+          flow.session.presenterStep !== "item-selected" ? (
             <>
-              <h2>Poslech za {selectedContent.item.points ?? 0}</h2>
-              <p>{selectedContent.item.prompt}</p>
-              {selectedContent.item.audio ? (
-                <AudioPlayer src={selectedContent.item.audio.src} />
-              ) : null}
-              {phase === "answer" ? (
+              <h2>Poslechové kolo</h2>
+              <p>{activeContent.item.prompt}</p>
+              {activeContent.item.audio ? <AudioPlayer src={activeContent.item.audio.src} /> : null}
+              {flow.answerVisible ? (
                 <div className="answer-panel">
                   <h3>Odpověď</h3>
-                  <p>Název: {listeningAnswerTitle(selectedContent.item)}</p>
-                  {listeningAnswerArtist(selectedContent.item) ? (
-                    <p>Interpret: {listeningAnswerArtist(selectedContent.item)}</p>
-                  ) : null}
-                  {selectedContent.item.moderatorNote ? (
-                    <p>{selectedContent.item.moderatorNote}</p>
-                  ) : null}
+                  <p>Interpret: {activeContent.item.artistAnswer ?? activeContent.item.artist}</p>
+                  <p>Název: {activeContent.item.trackTitleAnswer ?? activeContent.item.trackTitle}</p>
                 </div>
               ) : null}
             </>
-          )}
+          ) : null}
 
-          {selectedContent.kind === "common-denominator" && (
+          {activeContent.type === "common-denominator" &&
+          flow.session.presenterStep !== "item-selected" ? (
             <>
-              <h2>{selectedContent.round.title}</h2>
+              <h2>{activeContent.item.title}</h2>
               <ol className="clue-list">
-                {selectedContent.round.clues.map((clue, index) => (
+                {activeContent.item.clues.map((clue, index) => (
                   <li key={clue.id}>
                     <strong>Nápověda {index + 1}</strong>
-                    <span>{clue.prompt ?? clue.text}</span>
+                    <span>{clue.text ?? clue.prompt}</span>
                     {clue.audio ? <AudioPlayer src={clue.audio.src} /> : null}
                   </li>
                 ))}
               </ol>
-              {phase === "answer" ? (
+              {flow.answerVisible ? (
                 <div className="answer-panel">
                   <h3>Finální odpověď</h3>
-                  <p>{selectedContent.round.answer}</p>
-                  {selectedContent.round.moderatorNote ? (
-                    <p>{selectedContent.round.moderatorNote}</p>
-                  ) : null}
+                  <p>{activeContent.item.answer}</p>
+                  {activeContent.item.hint ? <p>{activeContent.item.hint}</p> : null}
                 </div>
               ) : null}
             </>
-          )}
+          ) : null}
 
-          {phase === "answer" ? (
+          {flow.answerVisible && activeContent.type === "question" ? (
             <div className="scoring-controls">
-              <label>
-                <span>Bodovaný tým</span>
-                <select
-                  value={activeTeamId}
-                  onChange={(event) => setActiveTeamId(event.target.value)}
-                >
-                  {game.teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button type="button" onClick={() => completeSelected(1, "correct")}>
+              <button type="button" onClick={markCorrect}>
                 Správně
               </button>
-              <button type="button" onClick={() => completeSelected(-1, "wrong")}>
+              <button type="button" onClick={markWrong}>
                 Špatně
               </button>
-              <button type="button" onClick={returnToBoard}>
+              <button type="button" onClick={() => flow.returnToBoard()}>
+                Zpět na tabuli
+              </button>
+            </div>
+          ) : null}
+
+          {flow.answerVisible && activeContent.type === "listening" ? (
+            <div className="scoring-controls">
+              {game.teams.map((team) => (
+                <label className="field-stack" key={team.id}>
+                  <span>{team.name}</span>
+                  <select
+                    value={flow.session.listeningScoringDraft[team.id] ?? 0}
+                    onChange={(event) =>
+                      flow.setListeningTeamScore(team.id, Number(event.target.value) as 0)
+                    }
+                  >
+                    {listeningScoreOptions.map((option) => (
+                      <option key={option.id} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+              <button type="button" onClick={flow.applyListeningScores}>
+                Zapsat poslechové body
+              </button>
+            </div>
+          ) : null}
+
+          {flow.answerVisible && activeContent.type === "common-denominator" ? (
+            <div className="scoring-controls">
+              {game.teams.map((team) => (
+                <button
+                  type="button"
+                  key={team.id}
+                  onClick={() => flow.awardCommonDenominator(team.id)}
+                >
+                  Přičíst {team.name}
+                </button>
+              ))}
+              <button type="button" onClick={() => flow.returnToBoard()}>
                 Zpět na tabuli
               </button>
             </div>
           ) : null}
         </section>
-      )}
+      ) : null}
     </section>
   );
+}
+
+export function PlayPage({ gameId }: PlayPageProps) {
+  const [game, setGame] = useState<Game | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadGame() {
+      try {
+        setError("");
+        const loadedGame = await gamesClient.loadGame(gameId);
+        if (isMounted) {
+          setGame(loadedGame);
+        }
+      } catch {
+        if (isMounted) {
+          setError("Hru se nepodařilo načíst.");
+        }
+      }
+    }
+
+    void loadGame();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [gameId]);
+
+  if (error) {
+    return (
+      <section className="page-panel page-panel-wide play-page" aria-labelledby="play-title">
+        <h1 id="play-title">Hra nenalezena</h1>
+        <p className="page-copy">{error}</p>
+      </section>
+    );
+  }
+
+  if (!game) {
+    return (
+      <section className="page-panel page-panel-wide play-page" aria-labelledby="play-title">
+        <h1 id="play-title">Načítám hru</h1>
+      </section>
+    );
+  }
+
+  return <PresenterView game={game} />;
 }
 
 export default PlayPage;

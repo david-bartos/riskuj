@@ -101,8 +101,8 @@ const commonDenominatorItems: CommonDenominatorItem[] = [
       { id: "cd-voda-2", text: "Vltava", prompt: "Vltava", order: 2 },
       {
         id: "cd-voda-3",
-        text: "Voda, čo ma drží nad vodou",
-        prompt: "Voda, čo ma drží nad vodou",
+        text: "Modrá planeta",
+        prompt: "Modrá planeta",
         order: 3
       }
     ]
