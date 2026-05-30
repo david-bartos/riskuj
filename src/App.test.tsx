@@ -67,7 +67,8 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: demoGame.title })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /České hity za 100/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /České hity za 1 000 Kč/i })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Skóre týmů" })).toBeInTheDocument();
   });
 
   it("naviguje z domovské stránky do editoru bez reloadu", () => {
