@@ -1124,31 +1124,90 @@ h4 {
   cursor: pointer;
 }
 
-.tile-button[aria-disabled="true"] {
+.tile-button[data-state="selected"] {
+  border-color: rgba(255, 255, 255, 0.86);
+  color: #d9e7ff;
+  background:
+    linear-gradient(180deg, rgba(8, 28, 74, 0.98), rgba(1, 8, 24, 0.98)),
+    #06142e;
+  box-shadow: inset 0 0 0 3px rgba(248, 216, 102, 0.28), 0 0 1.25rem rgba(0, 0, 0, 0.38);
+}
+
+.tile-button[aria-disabled="true"],
+.tile-button[data-state="completed"] {
   color: #d9e7ff;
   background: rgba(217, 231, 255, 0.14);
   border-color: rgba(217, 231, 255, 0.28);
   opacity: 0.76;
 }
 
-.presenter-panel {
-  margin-top: 1.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 8px;
-  padding: 1.5rem;
-  background: rgba(3, 19, 48, 0.72);
+.selected-tile-status {
+  margin: 1rem 0 0;
+  color: #f8d866;
+  font-size: 1rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.presenter-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: clamp(1rem, 4vw, 3rem);
+  background: rgba(1, 8, 24, 0.72);
+  backdrop-filter: blur(2px);
+}
+
+.presenter-dialog {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  width: min(100%, 64rem);
+  max-height: min(90vh, 54rem);
+  overflow: hidden;
+  border: 2px solid rgba(248, 216, 102, 0.72);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(11, 45, 131, 0.96), rgba(3, 19, 48, 0.98)),
+    #03123a;
+  box-shadow: 0 2rem 6rem rgba(0, 0, 0, 0.62), var(--shadow-gold);
   animation: presenter-reveal 180ms ease-out;
 }
 
-.presenter-panel p {
-  color: #f6f8ff;
-  font-size: 2rem;
-  line-height: 1.35;
+.presenter-dialog-content {
+  overflow: auto;
+  padding: clamp(1.5rem, 4vw, 3rem);
 }
 
-.presenter-panel audio {
+.presenter-dialog-content h2 {
+  margin: 0 0 1rem;
+  color: #f8d866;
+  font-size: clamp(2rem, 5vw, 4rem);
+  line-height: 1;
+}
+
+.presenter-dialog-content p {
+  color: #f6f8ff;
+  font-size: clamp(1.6rem, 4vw, 3rem);
+  line-height: 1.25;
+}
+
+.presenter-dialog-content audio {
   width: 100%;
   margin-top: 0.75rem;
+}
+
+.presenter-dialog-actions {
+  border-top: 1px solid rgba(248, 216, 102, 0.32);
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  background: rgba(1, 8, 24, 0.42);
+}
+
+.presenter-dialog-actions > button {
+  width: 100%;
+  min-height: 4rem;
+  font-size: clamp(1.25rem, 3vw, 2rem);
 }
 
 .answer-panel {

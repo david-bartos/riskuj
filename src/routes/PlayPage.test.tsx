@@ -39,23 +39,28 @@ describe("PlayPage", () => {
     expect(document.body.textContent).not.toContain("HUMAN");
   });
 
-  it("Enter posune otázku přes zadání, odpověď a správné skórování", async () => {
+  it("první klik dlaždici ztmaví, druhý klik otevře otázku v dialogu a tlačítko odhalí odpověď", async () => {
     render(<PlayPage gameId="riskuj-2026-06-06" />);
 
     await screen.findByRole("heading", { name: demoGame.title });
-    fireEvent.click(screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i }));
+    const tile = screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i });
 
-    expect(screen.getByText("Dlaždice je vybraná")).toBeInTheDocument();
+    fireEvent.click(tile);
+
+    expect(tile).toHaveAttribute("data-state", "selected");
+    expect(screen.queryByRole("dialog", { name: /Otázka za 1 000 Kč/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/Legendární panák B 52/i)).not.toBeInTheDocument();
 
-    fireEvent.keyDown(window, { key: "Enter" });
-    expect(await screen.findByText(/Legendární panák B 52/i)).toBeInTheDocument();
-    expect(screen.queryByText(/The B-52s/i)).not.toBeInTheDocument();
+    fireEvent.click(tile);
 
-    fireEvent.keyDown(window, { key: "Enter" });
-    expect(await screen.findByText(/The B-52s/i)).toBeInTheDocument();
+    const dialog = await screen.findByRole("dialog", { name: /Otázka za 1 000 Kč/i });
+    expect(within(dialog).getByText(/Legendární panák B 52/i)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/The B-52s/i)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Správně" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Zobrazit odpověď" }));
+    expect(await within(dialog).findByText(/The B-52s/i)).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Správně" }));
 
     const scoreboard = screen.getByRole("region", { name: "Skóre týmů" });
     expect(within(scoreboard).getByText("1 000 Kč")).toBeInTheDocument();

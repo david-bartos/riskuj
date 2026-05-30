@@ -116,8 +116,33 @@ function PresenterView({ game }: { game: Game }) {
     }
   }
 
+  function isActiveSelectedItem(roundId: string, itemId: string) {
+    return (
+      flow.session.presenterStep === "item-selected" &&
+      flow.session.activeItem?.roundId === roundId &&
+      flow.session.activeItem.itemId === itemId
+    );
+  }
+
+  function tileState(roundId: string, itemId: string) {
+    if (flow.session.completedItemIds.includes(itemId)) {
+      return "completed";
+    }
+
+    if (isActiveSelectedItem(roundId, itemId)) {
+      return "selected";
+    }
+
+    return "available";
+  }
+
   function selectItem(roundId: string, roundType: RoundType, itemId: string) {
     if (flow.session.completedItemIds.includes(itemId)) {
+      return;
+    }
+
+    if (isActiveSelectedItem(roundId, itemId)) {
+      flow.advance();
       return;
     }
 
@@ -191,6 +216,7 @@ function PresenterView({ game }: { game: Game }) {
                             <button
                               aria-disabled={isCompleted}
                               className="tile-button"
+                              data-state={tileState(round.id, item.id)}
                               disabled={isCompleted}
                               key={item.id}
                               onClick={() => selectItem(round.id, round.type, item.id)}
@@ -221,6 +247,7 @@ function PresenterView({ game }: { game: Game }) {
                       <button
                         aria-disabled={isCompleted}
                         className="tile-button"
+                        data-state={tileState(round.id, item.id)}
                         disabled={isCompleted}
                         key={item.id}
                         onClick={() => selectItem(round.id, round.type, item.id)}
@@ -245,6 +272,7 @@ function PresenterView({ game }: { game: Game }) {
                     <button
                       aria-disabled={isCompleted}
                       className="tile-button"
+                      data-state={tileState(round.id, item.id)}
                       disabled={isCompleted}
                       key={item.id}
                       onClick={() => selectItem(round.id, round.type, item.id)}
@@ -260,98 +288,122 @@ function PresenterView({ game }: { game: Game }) {
         })}
       </div>
 
-      {activeContent ? (
-        <section className="presenter-panel" aria-label="Vybraná položka">
-          {flow.session.presenterStep === "item-selected" ? (
-            <p className="stage-label">Dlaždice je vybraná</p>
-          ) : null}
+      {activeContent && flow.session.presenterStep === "item-selected" ? (
+        <p className="selected-tile-status" aria-live="polite">
+          Dlaždice je vybraná
+        </p>
+      ) : null}
 
-          {activeContent.type === "question" &&
-          flow.session.presenterStep !== "item-selected" ? (
-            <>
-              <h2>Otázka za {formatMoney(activeContent.item.value ?? activeContent.item.points)}</h2>
-              <p>{activeContent.item.prompt}</p>
-              {activeContent.item.audio ? <AudioPlayer src={activeContent.item.audio.src} /> : null}
-              {flow.answerVisible ? (
-                <div className="answer-panel">
-                  <h3>Odpověď</h3>
-                  <p>{activeContent.item.answer}</p>
-                  {activeContent.item.moderatorNote ? <p>{activeContent.item.moderatorNote}</p> : null}
+      {activeContent && flow.session.presenterStep !== "item-selected" ? (
+        <div className="presenter-dialog-backdrop">
+          <section
+            className="presenter-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="presenter-dialog-title"
+          >
+            <div className="presenter-dialog-content">
+              {activeContent.type === "question" ? (
+                <>
+                  <h2 id="presenter-dialog-title">
+                    Otázka za {formatMoney(activeContent.item.value ?? activeContent.item.points)}
+                  </h2>
+                  <p>{activeContent.item.prompt}</p>
+                  {activeContent.item.audio ? <AudioPlayer src={activeContent.item.audio.src} /> : null}
+                  {flow.answerVisible ? (
+                    <div className="answer-panel">
+                      <h3>Odpověď</h3>
+                      <p>{activeContent.item.answer}</p>
+                      {activeContent.item.moderatorNote ? <p>{activeContent.item.moderatorNote}</p> : null}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+
+              {activeContent.type === "listening" ? (
+                <>
+                  <h2 id="presenter-dialog-title">Poslechová otázka</h2>
+                  <ListeningRoundScreen item={activeContent.item} answerVisible={flow.answerVisible} />
+                </>
+              ) : null}
+
+              {activeContent.type === "common-denominator" ? (
+                <>
+                  <h2 id="presenter-dialog-title">Společný jmenovatel</h2>
+                  <CommonDenominatorRoundScreen
+                    item={activeContent.item}
+                    visibleClueIds={flow.session.revealedClueIds}
+                    answerVisible={flow.answerVisible}
+                  />
+                </>
+              ) : null}
+            </div>
+
+            <div className="presenter-dialog-actions">
+              {!flow.answerVisible ? (
+                <button type="button" onClick={flow.advance}>
+                  Zobrazit odpověď
+                </button>
+              ) : null}
+
+              {flow.answerVisible && activeContent.type === "question" ? (
+                <div className="scoring-controls">
+                  <button type="button" onClick={markCorrect}>
+                    Správně
+                  </button>
+                  <button type="button" onClick={markWrong}>
+                    Špatně
+                  </button>
+                  <button type="button" onClick={() => flow.returnToBoard()}>
+                    Zpět na tabuli
+                  </button>
                 </div>
               ) : null}
-            </>
-          ) : null}
 
-          {activeContent.type === "listening" &&
-          flow.session.presenterStep !== "item-selected" ? (
-            <ListeningRoundScreen item={activeContent.item} answerVisible={flow.answerVisible} />
-          ) : null}
+              {flow.answerVisible && activeContent.type === "listening" ? (
+                <div className="scoring-controls">
+                  {game.teams.map((team) => (
+                    <label className="field-stack" key={team.id}>
+                      <span>{team.name}</span>
+                      <select
+                        value={flow.session.listeningScoringDraft[team.id] ?? 0}
+                        onChange={(event) =>
+                          flow.setListeningTeamScore(team.id, Number(event.target.value) as 0)
+                        }
+                      >
+                        {listeningScoreOptions.map((option) => (
+                          <option key={option.id} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                  <button type="button" onClick={flow.applyListeningScores}>
+                    Zapsat poslechové body
+                  </button>
+                </div>
+              ) : null}
 
-          {activeContent.type === "common-denominator" &&
-          flow.session.presenterStep !== "item-selected" ? (
-            <CommonDenominatorRoundScreen
-              item={activeContent.item}
-              visibleClueIds={flow.session.revealedClueIds}
-              answerVisible={flow.answerVisible}
-            />
-          ) : null}
-
-          {flow.answerVisible && activeContent.type === "question" ? (
-            <div className="scoring-controls">
-              <button type="button" onClick={markCorrect}>
-                Správně
-              </button>
-              <button type="button" onClick={markWrong}>
-                Špatně
-              </button>
-              <button type="button" onClick={() => flow.returnToBoard()}>
-                Zpět na tabuli
-              </button>
+              {flow.answerVisible && activeContent.type === "common-denominator" ? (
+                <div className="scoring-controls">
+                  {game.teams.map((team) => (
+                    <button
+                      type="button"
+                      key={team.id}
+                      onClick={() => flow.awardCommonDenominator(team.id)}
+                    >
+                      Přičíst {team.name}
+                    </button>
+                  ))}
+                  <button type="button" onClick={() => flow.returnToBoard()}>
+                    Zpět na tabuli
+                  </button>
+                </div>
+              ) : null}
             </div>
-          ) : null}
-
-          {flow.answerVisible && activeContent.type === "listening" ? (
-            <div className="scoring-controls">
-              {game.teams.map((team) => (
-                <label className="field-stack" key={team.id}>
-                  <span>{team.name}</span>
-                  <select
-                    value={flow.session.listeningScoringDraft[team.id] ?? 0}
-                    onChange={(event) =>
-                      flow.setListeningTeamScore(team.id, Number(event.target.value) as 0)
-                    }
-                  >
-                    {listeningScoreOptions.map((option) => (
-                      <option key={option.id} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ))}
-              <button type="button" onClick={flow.applyListeningScores}>
-                Zapsat poslechové body
-              </button>
-            </div>
-          ) : null}
-
-          {flow.answerVisible && activeContent.type === "common-denominator" ? (
-            <div className="scoring-controls">
-              {game.teams.map((team) => (
-                <button
-                  type="button"
-                  key={team.id}
-                  onClick={() => flow.awardCommonDenominator(team.id)}
-                >
-                  Přičíst {team.name}
-                </button>
-              ))}
-              <button type="button" onClick={() => flow.returnToBoard()}>
-                Zpět na tabuli
-              </button>
-            </div>
-          ) : null}
-        </section>
+          </section>
+        </div>
       ) : null}
     </section>
   );
@@ -406,3 +458,4 @@ export function PlayPage({ gameId }: PlayPageProps) {
 }
 
 export default PlayPage;
+
