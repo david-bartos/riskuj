@@ -2,3 +2,7 @@ node_modules
 dist
 data/uploads
 .env
+server/data/games/*.json
+server/data/uploads/*
+!server/data/games/.gitkeep
+!server/data/uploads/.gitkeep
