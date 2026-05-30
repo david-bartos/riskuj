@@ -22,7 +22,7 @@ describe("gameJson", () => {
     expect(parsed.title).toBe(game.title);
     expect(parsed.questions).toEqual(game.questions);
     expect(parsed.rounds).toEqual(game.rounds);
-    expect(JSON.stringify(parsed)).toContain("/demo-audio/demo-placeholder-1.mp3");
+    expect(JSON.stringify(parsed)).toContain("/uploads/demo-placeholder.mp3");
   });
 
   it("odmítne nepodporovaný formát importu českou validační chybou", () => {

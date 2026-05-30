@@ -19,8 +19,16 @@ import {
   parseGameJson,
   serializeGameToJson
 } from "../../importExport/gameJson";
+import TeamSetup from "../game/TeamSetup";
 
 const questionPoints: QuestionPoints[] = [100, 200, 300, 400, 500];
+
+function createDefaultTeams() {
+  return Array.from({ length: 6 }, (_, index) => ({
+    id: `team-${index + 1}`,
+    name: `Tým ${index + 1}`
+  }));
+}
 
 function makeId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -40,6 +48,7 @@ type AudioEditorProps = {
 export function normalizeGame(game: Game): EditableGame {
   return {
     ...game,
+    teams: game.teams.length > 0 ? game.teams : createDefaultTeams(),
     listeningGenres: game.listeningGenres ?? [],
     listeningItems: game.listeningItems ?? [],
     commonDenominator: game.commonDenominator ?? { answer: "", clues: [] }
@@ -55,7 +64,7 @@ export function createEmptyGame(): Game {
   return {
     id: makeId("game"),
     title: "Nová hra",
-    teams: [],
+    teams: createDefaultTeams(),
     rounds: [],
     createdAt: now,
     updatedAt: now,
@@ -342,6 +351,11 @@ export default function GameEditor({
           }
         />
       </label>
+
+      <TeamSetup
+        teams={game.teams}
+        onChange={(teams) => setGame((current) => ({ ...current, teams }))}
+      />
 
       {errors.length > 0 ? (
         <div className="form-message form-message-error" role="alert">
