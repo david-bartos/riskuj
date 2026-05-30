@@ -32,11 +32,24 @@ describe("riskuj20260606Game", () => {
     expect(items.filter((item) => item.value === 5000)).toHaveLength(6);
     expect(items.filter((item) => item.value === 10000)).toHaveLength(6);
 
+    expect(items[0]).toEqual(
+      expect.objectContaining({
+        prompt: expect.stringContaining("Legendární panák B 52"),
+        answer: expect.stringContaining("kapely"),
+        reviewStatus: "ready"
+      })
+    );
+    expect(items[23]).toEqual(
+      expect.objectContaining({
+        prompt: expect.stringContaining("Přiřaď stát k interpretovi"),
+        answer: expect.stringContaining("1b, 2a, 3d, 4c"),
+        reviewStatus: "ready"
+      })
+    );
     for (const item of items) {
-      expect(item.prompt.trim()).not.toEqual("");
-      expect(item.answer.trim()).not.toEqual("");
-      expect(item.moderatorNote?.trim()).not.toEqual("");
-      expect(item.reviewStatus).toBe("needs-source");
+      expect(item.prompt).not.toContain("Doplnit");
+      expect(item.answer).not.toContain("Doplnit");
+      expect(item.reviewStatus).toBe("ready");
     }
   });
 
@@ -48,6 +61,21 @@ describe("riskuj20260606Game", () => {
     const items = round.items ?? round.tracks;
 
     expect(items).toHaveLength(15);
+    expect(items[0]).toEqual(
+      expect.objectContaining({
+        artist: "Kate Bush",
+        trackTitle: "Running Up That Hill",
+        categoryId: "zanr-80-90-leta",
+        reviewStatus: "ready"
+      })
+    );
+    expect(items[13]).toEqual(
+      expect.objectContaining({
+        artist: "J.A.R.",
+        trackTitle: "",
+        reviewStatus: "needs-review"
+      })
+    );
     expect(riskuj20260606Game.knownIssues?.map((issue) => issue.id)).toEqual(
       expect.arrayContaining(["listening-count-mismatch", "jar-missing-track-title"])
     );
@@ -68,10 +96,18 @@ describe("riskuj20260606Game", () => {
     const items = round.items ?? [];
 
     expect(items).toHaveLength(6);
+    expect(items.map((item) => item.answer)).toEqual([
+      "HUMAN",
+      "PEOPLE",
+      "PETR",
+      "DAVID",
+      "AUSTRÁLIE",
+      "KANADA"
+    ]);
     for (const item of items) {
       expect(item.clues.length).toBeGreaterThan(0);
       expect(item.answer.trim()).not.toEqual("");
-      expect(item.reviewStatus).toBe("needs-source");
+      expect(item.reviewStatus).toBe("ready");
     }
   });
 

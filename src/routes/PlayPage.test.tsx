@@ -33,13 +33,10 @@ describe("PlayPage", () => {
 
     await screen.findByRole("heading", { name: demoGame.title });
 
-    expect(document.body.textContent).not.toContain(
-      "Doplnit správnou odpověď podle finálního zadání."
-    );
-    expect(document.body.textContent).not.toContain("Doplnit interpret 1");
-    expect(document.body.textContent).not.toContain("Doplnit název skladby 1");
-    expect(document.body.textContent).not.toContain("Doplnit odpověď 1");
-    expect(document.body.textContent).not.toContain("Obsah otázky není v dostupném");
+    expect(document.body.textContent).not.toContain("The B-52s");
+    expect(document.body.textContent).not.toContain("Kate Bush");
+    expect(document.body.textContent).not.toContain("Running Up That Hill");
+    expect(document.body.textContent).not.toContain("HUMAN");
   });
 
   it("Enter posune otázku přes zadání, odpověď a správné skórování", async () => {
@@ -49,16 +46,14 @@ describe("PlayPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i }));
 
     expect(screen.getByText("Dlaždice je vybraná")).toBeInTheDocument();
-    expect(screen.queryByText(/Doplnit otázku 1/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Legendární panák B 52/i)).not.toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "Enter" });
-    expect(await screen.findByText(/Doplnit otázku 1/i)).toBeInTheDocument();
-    expect(screen.queryByText("Doplnit správnou odpověď podle finálního zadání.")).not.toBeInTheDocument();
+    expect(await screen.findByText(/Legendární panák B 52/i)).toBeInTheDocument();
+    expect(screen.queryByText(/The B-52s/i)).not.toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "Enter" });
-    expect(
-      await screen.findByText("Doplnit správnou odpověď podle finálního zadání.")
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/The B-52s/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Správně" }));
 
@@ -84,42 +79,42 @@ describe("PlayPage", () => {
     render(<PlayPage gameId="riskuj-2026-06-06" />);
 
     await screen.findByRole("heading", { name: demoGame.title });
-    fireEvent.click(screen.getAllByRole("button", { name: /Pop: poslech/i })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /80\. a 90\. léta: poslech/i })[0]);
     fireEvent.keyDown(window, { key: "Enter" });
 
     expect(await screen.findByLabelText("Přehrát audio ukázku")).toHaveAttribute(
       "src",
       "/uploads/riskuj-66-listen-01.mp3"
     );
-    expect(document.body.textContent).not.toContain("Doplnit interpret 1");
-    expect(document.body.textContent).not.toContain("Doplnit název skladby 1");
+    expect(document.body.textContent).not.toContain("Kate Bush");
+    expect(document.body.textContent).not.toContain("Running Up That Hill");
 
     fireEvent.keyDown(window, { key: "Enter" });
-    expect(await screen.findByText(/Doplnit interpret 1/i)).toBeInTheDocument();
-    expect(screen.getByText(/Doplnit název skladby 1/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Kate Bush/i)).toBeInTheDocument();
+    expect(screen.getByText(/Running Up That Hill/i)).toBeInTheDocument();
   });
 
   it("společný jmenovatel odhalí finální odpověď až po Enter", async () => {
     render(<PlayPage gameId="riskuj-2026-06-06" />);
 
     await screen.findByRole("heading", { name: demoGame.title });
-    fireEvent.click(screen.getByRole("button", { name: /Společný jmenovatel 1/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Společný jmenovatel: Human/i }));
     fireEvent.keyDown(window, { key: "Enter" });
 
-    expect(await screen.findByText("Doplnit indicii 1 pro společný jmenovatel 1.")).toBeInTheDocument();
-    expect(screen.queryByText("Doplnit indicii 2 pro společný jmenovatel 1.")).not.toBeInTheDocument();
-    expect(document.body.textContent).not.toContain("Doplnit odpověď 1");
+    expect(await screen.findByText("Bruce Springsteen")).toBeInTheDocument();
+    expect(screen.queryByText("The Killers")).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("HUMAN");
 
     fireEvent.keyDown(window, { key: "Enter" });
-    expect(await screen.findByText("Doplnit indicii 2 pro společný jmenovatel 1.")).toBeInTheDocument();
-    expect(screen.queryByText("Doplnit indicii 3 pro společný jmenovatel 1.")).not.toBeInTheDocument();
-    expect(document.body.textContent).not.toContain("Doplnit odpověď 1");
+    expect(await screen.findByText("The Killers")).toBeInTheDocument();
+    expect(screen.queryByText("Rag’n’Bone Man")).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("HUMAN");
 
     fireEvent.keyDown(window, { key: "Enter" });
-    expect(await screen.findByText("Doplnit indicii 3 pro společný jmenovatel 1.")).toBeInTheDocument();
-    expect(document.body.textContent).not.toContain("Doplnit odpověď 1");
+    expect(await screen.findByText("Rag’n’Bone Man")).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("HUMAN");
 
     fireEvent.keyDown(window, { key: "Enter" });
-    expect(await screen.findByText("Doplnit odpověď 1")).toBeInTheDocument();
+    expect(await screen.findByText("HUMAN")).toBeInTheDocument();
   });
 });
