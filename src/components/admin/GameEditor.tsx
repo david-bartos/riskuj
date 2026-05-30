@@ -2,6 +2,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import type {
   AudioAsset,
   Category,
+  CommonDenominatorItem,
   Game,
   ListeningGenre,
   ListeningItem,
@@ -38,6 +39,7 @@ type EditableGame = Game & {
   listeningGenres: ListeningGenre[];
   listeningItems: ListeningItem[];
   commonDenominator: NonNullable<Game["commonDenominator"]>;
+  commonDenominatorItems: CommonDenominatorItem[];
 };
 
 type AudioEditorProps = {
@@ -46,12 +48,28 @@ type AudioEditorProps = {
 };
 
 export function normalizeGame(game: Game): EditableGame {
+  const commonRound = game.rounds.find((round) => round.type === "common-denominator");
+  const commonDenominatorItems =
+    commonRound?.type === "common-denominator" && commonRound.items?.length
+      ? commonRound.items
+      : [
+          {
+            id: "common-denominator-1",
+            title: "Společný jmenovatel 1",
+            value: (commonRound?.points ?? 5000) as CommonDenominatorItem["value"],
+            answer: game.commonDenominator?.answer ?? commonRound?.answer ?? "",
+            clues: game.commonDenominator?.clues ?? commonRound?.clues ?? [],
+            moderatorNote: commonRound?.moderatorNote
+          }
+        ];
+
   return {
     ...game,
     teams: game.teams.length > 0 ? game.teams : createDefaultTeams(),
     listeningGenres: game.listeningGenres ?? [],
     listeningItems: game.listeningItems ?? [],
-    commonDenominator: game.commonDenominator ?? { answer: "", clues: [] }
+    commonDenominator: game.commonDenominator ?? { answer: "", clues: [] },
+    commonDenominatorItems
   };
 }
 
@@ -122,12 +140,20 @@ export function prepareGameForSave(game: EditableGame): Game {
         type: "common-denominator",
         title: commonRound?.title ?? "Společný jmenovatel",
         points: commonRound?.points ?? 300,
-        answer: game.commonDenominator.answer,
+        answer: game.commonDenominatorItems[0]?.answer ?? game.commonDenominator.answer,
         moderatorNote: commonRound?.moderatorNote,
-        clues: game.commonDenominator.clues.map((clue, index) => ({
+        clues: (game.commonDenominatorItems[0]?.clues ?? game.commonDenominator.clues).map((clue, index) => ({
           ...clue,
           order: clue.order ?? index + 1,
           prompt: clue.prompt ?? clue.text ?? ""
+        })),
+        items: game.commonDenominatorItems.map((item) => ({
+          ...item,
+          clues: item.clues.map((clue, index) => ({
+            ...clue,
+            order: clue.order ?? index + 1,
+            prompt: clue.prompt ?? clue.text ?? ""
+          }))
         }))
       }
     ]
@@ -152,10 +178,23 @@ export function validateGame(game: EditableGame): string[] {
   if (game.listeningItems.some((item) => !item.prompt.trim() || !item.answer.trim())) {
     messages.push("Poslechová položka musí mít zadání i odpověď.");
   }
-  if (!game.commonDenominator.answer.trim()) {
+  if (game.commonDenominatorItems.some((item) => !item.title.trim())) {
+    messages.push("Položka třetího kola musí mít vyplněný název.");
+  }
+  if (!game.commonDenominator.answer.trim() && game.commonDenominatorItems.length === 0) {
     messages.push("Třetí kolo musí mít vyplněný společný jmenovatel.");
   }
+  if (game.commonDenominatorItems.some((item) => !item.answer.trim())) {
+    messages.push("Každá položka třetího kola musí mít vyplněný společný jmenovatel.");
+  }
   if (game.commonDenominator.clues.some((clue) => !(clue.text ?? "").trim())) {
+    messages.push("Indicie ve třetím kole nesmí být prázdná.");
+  }
+  if (
+    game.commonDenominatorItems.some((item) =>
+      item.clues.some((clue) => !(clue.text ?? clue.prompt ?? "").trim())
+    )
+  ) {
     messages.push("Indicie ve třetím kole nesmí být prázdná.");
   }
 
@@ -212,6 +251,19 @@ export default function GameEditor({
     }));
   }
 
+  function updateCommonDenominatorItem(nextItem: CommonDenominatorItem) {
+    setGame((current) => ({
+      ...current,
+      commonDenominatorItems: current.commonDenominatorItems.map((item) =>
+        item.id === nextItem.id ? nextItem : item
+      ),
+      commonDenominator:
+        current.commonDenominatorItems[0]?.id === nextItem.id
+          ? { answer: nextItem.answer, clues: nextItem.clues }
+          : current.commonDenominator
+    }));
+  }
+
   function addCategory() {
     const category: Category = { id: makeId("category"), title: "Nová kategorie" };
     const questions: Question[] = questionPoints.map((points) => ({
@@ -258,6 +310,24 @@ export default function GameEditor({
             answer: ""
           }
         ]
+      };
+    });
+  }
+
+  function addCommonDenominatorItem() {
+    setGame((current) => {
+      const nextNumber = current.commonDenominatorItems.length + 1;
+      const item: CommonDenominatorItem = {
+        id: makeId("common"),
+        title: `Společný jmenovatel ${nextNumber}`,
+        value: 5000,
+        answer: "",
+        clues: [{ id: makeId("clue"), text: "", prompt: "", order: 1 }]
+      };
+
+      return {
+        ...current,
+        commonDenominatorItems: [...current.commonDenominatorItems, item]
       };
     });
   }
@@ -463,36 +533,51 @@ export default function GameEditor({
       </section>
 
       <section className="editor-section">
-        <h2>Třetí kolo: společný jmenovatel</h2>
-        <CommonDenominatorEditor
-          round={game.commonDenominator}
-          onChange={(commonDenominator) =>
-            setGame((current) => ({ ...current, commonDenominator }))
-          }
-          audioAssets={audioAssets}
-          onUploadAudio={onUploadAudio}
-          onAddClue={() =>
-            setGame((current) => ({
-              ...current,
-              commonDenominator: {
-                ...current.commonDenominator,
-                clues: [
-                  ...current.commonDenominator.clues,
-                  { id: makeId("clue"), text: "" }
-                ]
-              }
-            }))
-          }
-          onRemoveClue={(clueId) =>
-            setGame((current) => ({
-              ...current,
-              commonDenominator: {
-                ...current.commonDenominator,
-                clues: current.commonDenominator.clues.filter((clue) => clue.id !== clueId)
-              }
-            }))
-          }
-        />
+        <div className="section-heading-row">
+          <h2>Třetí kolo: společný jmenovatel</h2>
+          <button className="button-compact" type="button" onClick={addCommonDenominatorItem}>
+            Přidat společný jmenovatel
+          </button>
+        </div>
+        <div className="item-list">
+          {game.commonDenominatorItems.map((item, index) => (
+            <article className="editor-card" key={item.id}>
+              <label className="field-stack">
+                <span>{`Název položky společného jmenovatele ${index + 1}`}</span>
+                <input
+                  value={item.title}
+                  onChange={(event) =>
+                    updateCommonDenominatorItem({ ...item, title: event.target.value })
+                  }
+                />
+              </label>
+              <CommonDenominatorEditor
+                round={{ answer: item.answer, clues: item.clues }}
+                onChange={(commonDenominator) =>
+                  updateCommonDenominatorItem({
+                    ...item,
+                    answer: commonDenominator.answer,
+                    clues: commonDenominator.clues
+                  })
+                }
+                audioAssets={audioAssets}
+                onUploadAudio={onUploadAudio}
+                onAddClue={() =>
+                  updateCommonDenominatorItem({
+                    ...item,
+                    clues: [...item.clues, { id: makeId("clue"), text: "" }]
+                  })
+                }
+                onRemoveClue={(clueId) =>
+                  updateCommonDenominatorItem({
+                    ...item,
+                    clues: item.clues.filter((clue) => clue.id !== clueId)
+                  })
+                }
+              />
+            </article>
+          ))}
+        </div>
       </section>
 
       <div className="inline-actions">

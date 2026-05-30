@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import GameEditor, { normalizeGame, prepareGameForSave } from "./GameEditor";
 import type { Game } from "../../types/game";
+import { riskuj20260606Game } from "../../data/riskuj-2026-06-06";
 
 const gameFixture: Game = {
   id: "test-game",
@@ -180,5 +181,31 @@ describe("GameEditor", () => {
 
     expect(commonRound?.clues[0].audio).toEqual(audio);
     expect(commonRound?.clues[0].audio?.src).toBe("/uploads/clue.mp3");
+  });
+
+  it("umožní upravit a uložit všech 6 společných jmenovatelů ze seed hry", () => {
+    const onSave = vi.fn();
+    const { container } = render(<GameEditor initialGame={riskuj20260606Game} onSave={onSave} />);
+
+    const commonTitleInputs = Array.from(container.querySelectorAll("input")).filter((input) =>
+      input.value.startsWith("Společný jmenovatel")
+    );
+
+    expect(commonTitleInputs).toHaveLength(6);
+
+    fireEvent.change(commonTitleInputs[5], {
+      target: { value: "Finálový jmenovatel" }
+    });
+    fireEvent.click(container.querySelector('button[type="submit"]')!);
+
+    const savedGame = onSave.mock.calls[0][0] as Game;
+    const commonRound = savedGame.rounds.find((round) => round.type === "common-denominator");
+
+    expect(commonRound?.type).toBe("common-denominator");
+    if (commonRound?.type !== "common-denominator") {
+      throw new Error("Missing common-denominator round");
+    }
+    expect(commonRound.items).toHaveLength(6);
+    expect(commonRound.items?.[5].title).toBe("Finálový jmenovatel");
   });
 });
