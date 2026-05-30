@@ -405,3 +405,120 @@ h1 {
     padding-inline: 0.5rem;
   }
 }
+
+.stage-label {
+  margin: 0 0 0.5rem;
+  color: #f8d866;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.question-screen {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  gap: clamp(1.5rem, 4vw, 3rem);
+  justify-content: center;
+  padding: clamp(1.25rem, 5vw, 5rem);
+}
+
+.question-screen__meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.question-screen__points {
+  flex: 0 0 auto;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(248, 216, 102, 0.34);
+  border-radius: 8px;
+  background: rgba(248, 216, 102, 0.14);
+  color: #fff5bc;
+  font-size: clamp(1.1rem, 3vw, 1.7rem);
+}
+
+.question-screen__prompt {
+  max-width: 68rem;
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(1.8rem, 5vw, 4.4rem);
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.question-screen__audio,
+.question-screen__answer {
+  max-width: 48rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(3, 19, 48, 0.72);
+}
+
+.question-screen__audio h2,
+.question-screen__answer p:last-child {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(1.25rem, 3vw, 2rem);
+  line-height: 1.25;
+}
+
+.question-screen__audio audio {
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.question-screen__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.question-screen__result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.question-screen button {
+  min-height: 3rem;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  background: #f8d866;
+  color: #071b3f;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.question-screen button:hover:not(:disabled) {
+  background: #ffe58a;
+}
+
+.question-screen button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.question-screen .question-screen__back {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+@media (max-width: 640px) {
+  .question-screen__meta,
+  .question-screen__controls,
+  .question-screen__result-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .question-screen__points {
+    align-self: flex-start;
+  }
+}
