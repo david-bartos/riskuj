@@ -15,7 +15,7 @@ describe("PlayPage", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
-        if (String(input) === "/api/games/demo-hudebni-riskuj") {
+        if (String(input) === "/api/games/riskuj-2026-06-06") {
           return Response.json(demoGame);
         }
 
@@ -29,45 +29,49 @@ describe("PlayPage", () => {
   });
 
   it("odpovědi nejsou v presenter DOM před explicitním odkrytím", async () => {
-    render(<PlayPage gameId="demo-hudebni-riskuj" />);
+    render(<PlayPage gameId="riskuj-2026-06-06" />);
 
     await screen.findByRole("heading", { name: demoGame.title });
 
-    expect(document.body.textContent).not.toContain("Ivan Mládek");
-    expect(document.body.textContent).not.toContain("Lenka Dusilová");
-    expect(document.body.textContent).not.toContain("Pro Tebe");
-    expect(document.body.textContent).not.toContain("Voda");
-    expect(document.body.textContent).not.toContain("Uznat i kapelu Banjo Band.");
+    expect(document.body.textContent).not.toContain(
+      "Doplnit správnou odpověď podle finálního zadání."
+    );
+    expect(document.body.textContent).not.toContain("Doplnit interpret 1");
+    expect(document.body.textContent).not.toContain("Doplnit název skladby 1");
+    expect(document.body.textContent).not.toContain("Doplnit odpověď 1");
+    expect(document.body.textContent).not.toContain("Obsah otázky není v dostupném");
   });
 
   it("Enter posune otázku přes zadání, odpověď a správné skórování", async () => {
-    render(<PlayPage gameId="demo-hudebni-riskuj" />);
+    render(<PlayPage gameId="riskuj-2026-06-06" />);
 
     await screen.findByRole("heading", { name: demoGame.title });
-    fireEvent.click(screen.getByRole("button", { name: /České hity za 1 000 Kč/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i }));
 
     expect(screen.getByText("Dlaždice je vybraná")).toBeInTheDocument();
-    expect(screen.queryByText(/Jožin z bažin/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Doplnit otázku 1/i)).not.toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "Enter" });
-    expect(await screen.findByText(/Jožin z bažin/i)).toBeInTheDocument();
-    expect(screen.queryByText("Ivan Mládek")).not.toBeInTheDocument();
+    expect(await screen.findByText(/Doplnit otázku 1/i)).toBeInTheDocument();
+    expect(screen.queryByText("Doplnit správnou odpověď podle finálního zadání.")).not.toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "Enter" });
-    expect(await screen.findByText("Ivan Mládek")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Doplnit správnou odpověď podle finálního zadání.")
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Správně" }));
 
     const scoreboard = screen.getByRole("region", { name: "Skóre týmů" });
     expect(within(scoreboard).getByText("1 000 Kč")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /České hity za 1 000 Kč/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i })).toBeDisabled();
   });
 
   it("špatná odpověď skóre nemění", async () => {
-    render(<PlayPage gameId="demo-hudebni-riskuj" />);
+    render(<PlayPage gameId="riskuj-2026-06-06" />);
 
     await screen.findByRole("heading", { name: demoGame.title });
-    fireEvent.click(screen.getByRole("button", { name: /Rock za 10 000 Kč/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Hudební otázky 1 za 10 000 Kč/i }));
     fireEvent.keyDown(window, { key: "Enter" });
     fireEvent.keyDown(window, { key: "Enter" });
     fireEvent.click(screen.getByRole("button", { name: "Špatně" }));
@@ -77,35 +81,35 @@ describe("PlayPage", () => {
   });
 
   it("poslech přehraje MP3 a odpověď odhalí až po Enter", async () => {
-    render(<PlayPage gameId="demo-hudebni-riskuj" />);
+    render(<PlayPage gameId="riskuj-2026-06-06" />);
 
     await screen.findByRole("heading", { name: demoGame.title });
-    fireEvent.click(screen.getByRole("button", { name: /CZ pop/i }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Pop: poslech/i })[0]);
     fireEvent.keyDown(window, { key: "Enter" });
 
     expect(await screen.findByLabelText("Přehrát audio ukázku")).toHaveAttribute(
       "src",
-      "/uploads/demo-placeholder.mp3"
+      "/uploads/riskuj-66-listen-01.mp3"
     );
-    expect(document.body.textContent).not.toContain("Lenka Dusilová");
-    expect(document.body.textContent).not.toContain("Pro Tebe");
+    expect(document.body.textContent).not.toContain("Doplnit interpret 1");
+    expect(document.body.textContent).not.toContain("Doplnit název skladby 1");
 
     fireEvent.keyDown(window, { key: "Enter" });
-    expect(await screen.findByText(/Lenka Dusilová/i)).toBeInTheDocument();
-    expect(screen.getByText(/Pro Tebe/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Doplnit interpret 1/i)).toBeInTheDocument();
+    expect(screen.getByText(/Doplnit název skladby 1/i)).toBeInTheDocument();
   });
 
   it("společný jmenovatel odhalí finální odpověď až po Enter", async () => {
-    render(<PlayPage gameId="demo-hudebni-riskuj" />);
+    render(<PlayPage gameId="riskuj-2026-06-06" />);
 
     await screen.findByRole("heading", { name: demoGame.title });
     fireEvent.click(screen.getByRole("button", { name: /Společný jmenovatel 1/i }));
     fireEvent.keyDown(window, { key: "Enter" });
 
-    expect(await screen.findByText("Vltava")).toBeInTheDocument();
-    expect(document.body.textContent).not.toContain("Voda");
+    expect(await screen.findByText("Doplnit indicii 2 pro společný jmenovatel 1.")).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("Doplnit odpověď 1");
 
     fireEvent.keyDown(window, { key: "Enter" });
-    expect(await screen.findByText("Voda")).toBeInTheDocument();
+    expect(await screen.findByText("Doplnit odpověď 1")).toBeInTheDocument();
   });
 });

@@ -6,6 +6,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { AudioAsset, Game } from "../src/types/game";
+import { getSeedGame, listSeedGames } from "../src/data/games";
 import { assertValidGame, createEmptyGame, GameValidationError } from "./gameValidation";
 import { GamesRepository, isSafeGameId } from "./gamesRepository";
 
@@ -152,7 +153,13 @@ export function createServer(options: CreateServerOptions = {}) {
   app.get(
     "/api/games",
     asyncHandler(async (_request, response) => {
-      response.json(await gamesRepository.list());
+      const runtimeGames = await gamesRepository.list();
+      const runtimeIds = new Set(runtimeGames.map((game) => game.id));
+      const seedSummaries = listSeedGames()
+        .filter((game) => !runtimeIds.has(game.id))
+        .map(({ teamCount: _teamCount, knownIssueCount: _knownIssueCount, ...summary }) => summary);
+
+      response.json([...runtimeGames, ...seedSummaries]);
     })
   );
 
@@ -169,6 +176,12 @@ export function createServer(options: CreateServerOptions = {}) {
       const game = await gamesRepository.load(id);
 
       if (!game) {
+        const seedGame = getSeedGame(id);
+        if (seedGame) {
+          response.json(seedGame);
+          return;
+        }
+
         response.status(404).json({ message: "Hra nebyla nalezena." });
         return;
       }

@@ -9,7 +9,7 @@ type LayoutProps = {
 const navItems = [
   { label: "Domů", path: "/" },
   { label: "Editor", path: "/admin" },
-  { label: "Demo hra", path: "/play/demo" }
+  { label: "Riskuj 6.6", path: "/play/riskuj-2026-06-06" }
 ];
 
 export function Layout({ children, currentPath, onNavigate }: LayoutProps) {

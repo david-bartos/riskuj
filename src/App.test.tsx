@@ -61,14 +61,25 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Uložit hru" })).toBeInTheDocument();
   });
 
-  it("zobrazí herní tabuli na /play/demo", async () => {
-    window.history.pushState({}, "", "/play/demo-hudebni-riskuj");
+  it("zobrazí herní tabuli na /play/riskuj-2026-06-06", async () => {
+    window.history.pushState({}, "", "/play/riskuj-2026-06-06");
 
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: demoGame.title })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /České hity za 1 000 Kč/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i })
+    ).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Skóre týmů" })).toBeInTheDocument();
+  });
+
+  it("naviguje z domovské stránky přímo do seed hry Riskuj 6.6", () => {
+    window.history.pushState({}, "", "/");
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Spustit hru" }));
+
+    expect(window.location.pathname).toBe("/play/riskuj-2026-06-06");
   });
 
   it("naviguje z domovské stránky do editoru bez reloadu", () => {

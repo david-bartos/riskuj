@@ -2,6 +2,14 @@ export type MoneyValue = 0 | 1000 | 3000 | 5000 | 10000;
 export type RoundType = "question" | "listening" | "common-denominator";
 export type GameRoundType = RoundType;
 export type QuestionPoints = number;
+export type ReviewStatus = "ready" | "needs-source" | "needs-review";
+
+export interface KnownIssue {
+  id: string;
+  severity: "info" | "warning" | "blocking";
+  message: string;
+  source?: string;
+}
 
 export interface AudioAsset {
   id: string;
@@ -15,6 +23,7 @@ export interface AudioAsset {
   displayName?: string;
   url?: string;
   artist?: string;
+  needsUpload?: boolean;
 }
 
 export interface Team {
@@ -41,9 +50,18 @@ export interface QuestionItem {
   answer: string;
   moderatorNote?: string;
   audio?: AudioAsset;
+  options?: QuestionOption[];
+  correctOptionId?: string;
+  reviewStatus?: ReviewStatus;
 }
 
 export type Question = QuestionItem;
+
+export interface QuestionOption {
+  id: string;
+  label: string;
+  text: string;
+}
 
 export interface ListeningItem {
   id: string;
@@ -62,6 +80,8 @@ export interface ListeningItem {
   audioUrl?: string;
   trackTitleAnswer?: string;
   artistAnswer?: string;
+  reviewStatus?: ReviewStatus;
+  knownIssueIds?: string[];
 }
 
 export interface CommonDenominatorClue {
@@ -83,6 +103,8 @@ export interface CommonDenominatorItem {
   value: Exclude<MoneyValue, 0>;
   hint?: string;
   moderatorNote?: string;
+  reviewStatus?: ReviewStatus;
+  knownIssueIds?: string[];
 }
 
 export interface BaseRound {
@@ -138,6 +160,7 @@ export interface Game {
     answer: string;
     clues: CommonDenominatorClue[];
   };
+  knownIssues?: KnownIssue[];
 }
 
 export interface GameSummary {
