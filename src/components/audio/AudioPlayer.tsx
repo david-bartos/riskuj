@@ -21,8 +21,14 @@ export function AudioPlayer({ audio, className }: AudioPlayerProps) {
   const rootClassName = ["audio-player", className].filter(Boolean).join(" ");
 
   useEffect(() => {
+    const audioElement = audioRef.current;
+
     setIsPlaying(false);
     setHasError(false);
+
+    return () => {
+      audioElement?.pause();
+    };
   }, [src]);
 
   async function handleTogglePlayback() {

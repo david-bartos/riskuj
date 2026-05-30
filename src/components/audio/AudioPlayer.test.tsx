@@ -28,6 +28,9 @@ function mockMediaMethods({
 describe("AudioPlayer", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(window.HTMLMediaElement.prototype, "pause").mockImplementation(
+      () => undefined
+    );
   });
 
   it("zobrazí velkou akci pro přehrání dostupné audio ukázky", () => {
@@ -167,5 +170,49 @@ describe("AudioPlayer", () => {
     expect(
       screen.getByRole("button", { name: "Přehrát ukázku" })
     ).toBeEnabled();
+  });
+
+  it("při změně, odebrání nebo odpojení zastaví aktuální audio element", async () => {
+    const { play, pause } = mockMediaMethods();
+    const { rerender, unmount } = render(<AudioPlayer audio={demoAudio} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Přehrát ukázku" }));
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+
+    rerender(
+      <AudioPlayer
+        audio={{
+          id: "second",
+          src: "/uploads/second.mp3",
+          title: "Druhá ukázka"
+        }}
+      />
+    );
+
+    expect(pause).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Přehrát ukázku" }));
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(2));
+
+    rerender(<AudioPlayer />);
+
+    expect(pause).toHaveBeenCalledTimes(2);
+
+    rerender(
+      <AudioPlayer
+        audio={{
+          id: "third",
+          src: "/uploads/third.mp3",
+          title: "Třetí ukázka"
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Přehrát ukázku" }));
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(3));
+
+    unmount();
+
+    expect(pause).toHaveBeenCalledTimes(3);
   });
 });
