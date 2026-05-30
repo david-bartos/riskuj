@@ -31,7 +31,12 @@ export function TeamScoreboard({
       {teams.map((team) => {
         const isActive = team.id === activeTeamId;
         return (
-          <article className="team-scoreboard-tile" data-active={isActive ? "true" : "false"} key={team.id}>
+          <article
+            className="team-scoreboard-tile"
+            data-active={isActive ? "true" : "false"}
+            key={team.id}
+            style={{ borderColor: team.color }}
+          >
             <button
               type="button"
               className="team-scoreboard-main"
@@ -39,7 +44,7 @@ export function TeamScoreboard({
               aria-pressed={isActive}
               onClick={() => onSelectTeam?.(team.id)}
             >
-              <span>{team.name}</span>
+              <span style={{ color: team.color }}>{team.name}</span>
               <strong>{formatScore(scoreForTeam(scores, team.id))}</strong>
             </button>
             {onAdjustScore ? (
@@ -68,3 +73,4 @@ export function TeamScoreboard({
 }
 
 export default TeamScoreboard;
+

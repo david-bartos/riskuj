@@ -1136,7 +1136,21 @@ h4 {
   box-shadow: inset 0 0 0 3px rgba(248, 216, 102, 0.28), 0 0 1.25rem rgba(0, 0, 0, 0.38);
 }
 
-.tile-button[aria-disabled="true"],
+.tile-button[data-state="awarded"] {
+  border-color: rgba(255, 255, 255, 0.78);
+  color: #ffffff;
+  text-shadow: 0 0.12rem 0 rgba(0, 0, 0, 0.42);
+}
+
+.tile-button[data-state="unanswered"] {
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #d9e7ff;
+  background:
+    linear-gradient(180deg, rgba(8, 13, 24, 0.98), rgba(0, 0, 0, 0.98)),
+    #000000;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
 .tile-button[data-state="completed"] {
   color: #d9e7ff;
   background: rgba(217, 231, 255, 0.14);
@@ -1293,3 +1307,4 @@ h4 {
     font-size: 1.45rem;
   }
 }
+

@@ -60,11 +60,76 @@ describe("PlayPage", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Zobrazit odpověď" }));
     expect(await within(dialog).findByText(/The B-52s/i)).toBeInTheDocument();
 
-    fireEvent.click(within(dialog).getByRole("button", { name: "Správně" }));
+    const team1Button = within(dialog).getByRole("button", {
+      name: "Přičíst Tým 1: 1 000 Kč"
+    });
+    expect(team1Button).toHaveStyle({ backgroundColor: demoGame.teams[0].color });
+    fireEvent.click(team1Button);
 
     const scoreboard = screen.getByRole("region", { name: "Skóre týmů" });
     expect(within(scoreboard).getByText("1 000 Kč")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i })).toHaveAttribute(
+      "data-state",
+      "awarded"
+    );
+  });
+
+
+  it("umožní označit otázku jako neuhodnutou a později opravit přiřazení jinému týmu", async () => {
+    render(<PlayPage gameId="riskuj-2026-06-06" />);
+
+    await screen.findByRole("heading", { name: demoGame.title });
+    const tile = screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i });
+
+    fireEvent.click(tile);
+    fireEvent.click(tile);
+    fireEvent.click(await screen.findByRole("button", { name: "Zobrazit odpověď" }));
+
+    const firstDialog = await screen.findByRole("dialog", { name: /Otázka za 1 000 Kč/i });
+    fireEvent.click(within(firstDialog).getByRole("button", { name: "Nikdo neuhodl" }));
+
+    expect(tile).toHaveAttribute("data-state", "unanswered");
+    const scoreboard = screen.getByRole("region", { name: "Skóre týmů" });
+    expect(within(scoreboard).getAllByText("0 Kč")).toHaveLength(6);
+
+    fireEvent.click(tile);
+    const correctionDialog = await screen.findByRole("dialog", { name: /Otázka za 1 000 Kč/i });
+    expect(within(correctionDialog).getByText(/The B-52s/i)).toBeInTheDocument();
+    fireEvent.click(
+      within(correctionDialog).getByRole("button", { name: "Přičíst Tým 2: 1 000 Kč" })
+    );
+
+    expect(within(scoreboard).getByText("1 000 Kč")).toBeInTheDocument();
+    expect(tile).toHaveAttribute("data-state", "awarded");
+  });
+
+  it("přeřazení správné odpovědi odečte body původnímu týmu a přičte je novému", async () => {
+    render(<PlayPage gameId="riskuj-2026-06-06" />);
+
+    await screen.findByRole("heading", { name: demoGame.title });
+    const tile = screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i });
+
+    fireEvent.click(tile);
+    fireEvent.click(tile);
+    fireEvent.click(await screen.findByRole("button", { name: "Zobrazit odpověď" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog", { name: /Otázka za 1 000 Kč/i })).getByRole(
+        "button",
+        { name: "Přičíst Tým 1: 1 000 Kč" }
+      )
+    );
+
+    fireEvent.click(tile);
+    fireEvent.click(
+      within(await screen.findByRole("dialog", { name: /Otázka za 1 000 Kč/i })).getByRole(
+        "button",
+        { name: "Přičíst Tým 2: 1 000 Kč" }
+      )
+    );
+
+    const scoreboard = screen.getByRole("region", { name: "Skóre týmů" });
+    expect(within(scoreboard).getAllByText("0 Kč")).toHaveLength(5);
+    expect(within(scoreboard).getByText("1 000 Kč")).toBeInTheDocument();
   });
 
   it("Enter po kliknutí na focused dlaždici zůstane na otázce a nevybere dlaždici znovu", async () => {
@@ -85,14 +150,14 @@ describe("PlayPage", () => {
     expect(screen.queryByText("Dlaždice je vybraná")).not.toBeInTheDocument();
   });
 
-  it("špatná odpověď skóre nemění", async () => {
+  it("neuhodnutá otázka skóre nemění", async () => {
     render(<PlayPage gameId="riskuj-2026-06-06" />);
 
     await screen.findByRole("heading", { name: demoGame.title });
     fireEvent.click(screen.getByRole("button", { name: /Hudební otázky 1 za 10 000 Kč/i }));
     fireEvent.keyDown(window, { key: "Enter" });
     fireEvent.keyDown(window, { key: "Enter" });
-    fireEvent.click(screen.getByRole("button", { name: "Špatně" }));
+    fireEvent.click(screen.getByRole("button", { name: "Nikdo neuhodl" }));
 
     const scoreboard = screen.getByRole("region", { name: "Skóre týmů" });
     expect(within(scoreboard).getAllByText("0 Kč")).toHaveLength(6);
@@ -141,3 +206,4 @@ describe("PlayPage", () => {
     expect(await screen.findByText("HUMAN")).toBeInTheDocument();
   });
 });
+

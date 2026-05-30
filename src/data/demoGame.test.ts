@@ -35,7 +35,7 @@ describe("demoGame", () => {
     );
     expect(round.items).toHaveLength(24);
     expect(round.items?.[0]?.answer).toContain("The B-52s");
-    expect(round.items?.[0]?.moderatorNote).toBeTruthy();
+    expect(round.items?.[0]?.moderatorNote ?? "").not.toContain("Zadání převzato");
   });
 
   it("má poslechové kolo s audio položkou a skryvatelnou odpovědí", () => {
@@ -63,3 +63,4 @@ describe("demoGame", () => {
     expect(round.items?.[0]?.value).toBe(5000);
   });
 });
+

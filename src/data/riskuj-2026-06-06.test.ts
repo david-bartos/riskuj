@@ -8,7 +8,7 @@ describe("riskuj20260606Game", () => {
     expect(validateGame(riskuj20260606Game)).toEqual([]);
   });
 
-  it("obsahuje 6 týmů pro kvíz 6.6", () => {
+  it("obsahuje 6 barevně odlišených týmů pro kvíz 6.6", () => {
     expect(riskuj20260606Game.teams.map((team) => team.name)).toEqual([
       "Tým 1",
       "Tým 2",
@@ -16,6 +16,14 @@ describe("riskuj20260606Game", () => {
       "Tým 4",
       "Tým 5",
       "Tým 6"
+    ]);
+    expect(riskuj20260606Game.teams.map((team) => team.color)).toEqual([
+      "#ef4444",
+      "#3b82f6",
+      "#22c55e",
+      "#f59e0b",
+      "#a855f7",
+      "#06b6d4"
     ]);
   });
 
@@ -50,6 +58,8 @@ describe("riskuj20260606Game", () => {
       expect(item.prompt).not.toContain("Doplnit");
       expect(item.answer).not.toContain("Doplnit");
       expect(item.reviewStatus).toBe("ready");
+      expect(item.moderatorNote ?? "").not.toContain("Zadání převzato");
+      expect(item.moderatorNote ?? "").not.toContain("dodaného briefu");
     }
   });
 
@@ -123,3 +133,4 @@ describe("riskuj20260606Game", () => {
     );
   });
 });
+

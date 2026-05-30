@@ -12,9 +12,12 @@ import type {
 const timestamp = "2026-05-30T00:00:00.000Z";
 const values: QuestionPoints[] = [1000, 3000, 5000, 10000];
 
+const teamColors = ["#ef4444", "#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#06b6d4"];
+
 const teams: Team[] = Array.from({ length: 6 }, (_, index) => ({
   id: `team-${index + 1}`,
-  name: `Tým ${index + 1}`
+  name: `Tým ${index + 1}`,
+  color: teamColors[index]
 }));
 
 const categories: QuestionCategory[] = [
@@ -245,7 +248,7 @@ function createQuestion(
     answer: seed.answer,
     options: seed.options,
     correctOptionId: seed.correctOptionId,
-    moderatorNote: seed.moderatorNote ?? "Zadání převzato z dodaného briefu pro kvíz 6.6.",
+    moderatorNote: seed.moderatorNote,
     reviewStatus: "ready"
   };
 }
@@ -459,3 +462,4 @@ export const riskuj20260606Game: Game = {
   createdAt: timestamp,
   updatedAt: timestamp
 };
+

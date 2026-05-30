@@ -125,6 +125,15 @@ function PresenterView({ game }: { game: Game }) {
   }
 
   function tileState(roundId: string, itemId: string) {
+    const award = flow.session.itemAwards[itemId];
+    if (award?.teamId) {
+      return "awarded";
+    }
+
+    if (award) {
+      return "unanswered";
+    }
+
     if (flow.session.completedItemIds.includes(itemId)) {
       return "completed";
     }
@@ -137,17 +146,28 @@ function PresenterView({ game }: { game: Game }) {
   }
 
   function selectItem(roundId: string, roundType: RoundType, itemId: string) {
-    if (flow.session.completedItemIds.includes(itemId)) {
-      return;
-    }
-
     if (isActiveSelectedItem(roundId, itemId)) {
       flow.advance();
       return;
     }
 
+    if (flow.session.completedItemIds.includes(itemId)) {
+      flow.reopenItemForCorrection(roundId, roundType, itemId);
+      return;
+    }
+
     flow.selectItem(roundId, roundType, itemId);
     playPresenterSfx("open");
+  }
+
+  function tileStyle(itemId: string) {
+    const teamId = flow.session.itemAwards[itemId]?.teamId;
+    const team = game.teams.find((candidate) => candidate.id === teamId);
+    return team?.color ? { backgroundColor: team.color } : undefined;
+  }
+
+  function awardValueLabel(value: number) {
+    return formatMoney(value);
   }
 
   function markCorrect() {
@@ -214,10 +234,10 @@ function PresenterView({ game }: { game: Game }) {
                           const isCompleted = flow.session.completedItemIds.includes(item.id);
                           return (
                             <button
-                              aria-disabled={isCompleted}
+                              aria-disabled={false}
                               className="tile-button"
                               data-state={tileState(round.id, item.id)}
-                              disabled={isCompleted}
+                              style={tileStyle(item.id)}
                               key={item.id}
                               onClick={() => selectItem(round.id, round.type, item.id)}
                               type="button"
@@ -245,10 +265,10 @@ function PresenterView({ game }: { game: Game }) {
                     const isCompleted = flow.session.completedItemIds.includes(item.id);
                     return (
                       <button
-                        aria-disabled={isCompleted}
+                        aria-disabled={false}
                         className="tile-button"
                         data-state={tileState(round.id, item.id)}
-                        disabled={isCompleted}
+                        style={tileStyle(item.id)}
                         key={item.id}
                         onClick={() => selectItem(round.id, round.type, item.id)}
                         type="button"
@@ -270,10 +290,10 @@ function PresenterView({ game }: { game: Game }) {
                   const isCompleted = flow.session.completedItemIds.includes(item.id);
                   return (
                     <button
-                      aria-disabled={isCompleted}
+                      aria-disabled={false}
                       className="tile-button"
                       data-state={tileState(round.id, item.id)}
-                      disabled={isCompleted}
+                      style={tileStyle(item.id)}
                       key={item.id}
                       onClick={() => selectItem(round.id, round.type, item.id)}
                       type="button"
@@ -347,12 +367,23 @@ function PresenterView({ game }: { game: Game }) {
               ) : null}
 
               {flow.answerVisible && activeContent.type === "question" ? (
-                <div className="scoring-controls">
-                  <button type="button" onClick={markCorrect}>
-                    Správně
-                  </button>
-                  <button type="button" onClick={markWrong}>
-                    Špatně
+                <div className="scoring-controls scoring-controls-teams">
+                  {game.teams.map((team) => {
+                    const value = activeContent.item.value ?? activeContent.item.points;
+                    return (
+                      <button
+                        type="button"
+                        key={team.id}
+                        className="team-award-button"
+                        style={{ backgroundColor: team.color }}
+                        onClick={() => flow.awardActiveItemToTeam(team.id)}
+                      >
+                        Přičíst {team.name}: {awardValueLabel(value)}
+                      </button>
+                    );
+                  })}
+                  <button type="button" className="no-award-button" onClick={flow.markActiveItemUnanswered}>
+                    Nikdo neuhodl
                   </button>
                   <button type="button" onClick={() => flow.returnToBoard()}>
                     Zpět na tabuli
@@ -386,16 +417,21 @@ function PresenterView({ game }: { game: Game }) {
               ) : null}
 
               {flow.answerVisible && activeContent.type === "common-denominator" ? (
-                <div className="scoring-controls">
+                <div className="scoring-controls scoring-controls-teams">
                   {game.teams.map((team) => (
                     <button
                       type="button"
                       key={team.id}
+                      className="team-award-button"
+                      style={{ backgroundColor: team.color }}
                       onClick={() => flow.awardCommonDenominator(team.id)}
                     >
-                      Přičíst {team.name}
+                      Přičíst {team.name}: {awardValueLabel(activeContent.item.value)}
                     </button>
                   ))}
+                  <button type="button" className="no-award-button" onClick={flow.markActiveItemUnanswered}>
+                    Nikdo neuhodl
+                  </button>
                   <button type="button" onClick={() => flow.returnToBoard()}>
                     Zpět na tabuli
                   </button>
@@ -458,4 +494,6 @@ export function PlayPage({ gameId }: PlayPageProps) {
 }
 
 export default PlayPage;
+
+
 
