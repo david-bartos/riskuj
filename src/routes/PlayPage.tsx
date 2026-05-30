@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { gamesClient } from "../api/gamesClient";
+import { playSfx, type SfxName } from "../audio/sfx";
+import { useFullscreen } from "../hooks/useFullscreen";
 import type {
   CommonDenominatorRound,
   Game,
@@ -98,6 +100,8 @@ function AudioPlayer({ src }: { src: string }) {
 }
 
 export function PlayPage({ gameId }: PlayPageProps) {
+  const presenterRef = useRef<HTMLElement>(null);
+  const { isFullscreen, isSupported, toggleFullscreen } = useFullscreen(presenterRef);
   const [game, setGame] = useState<Game | null>(null);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<SelectedTarget | null>(null);
@@ -105,6 +109,7 @@ export function PlayPage({ gameId }: PlayPageProps) {
   const [completedIds, setCompletedIds] = useState<string[]>([]);
   const [scores, setScores] = useState<Record<string, number>>({});
   const [activeTeamId, setActiveTeamId] = useState("");
+  const [isSoundEnabled, setIsSoundEnabled] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -165,6 +170,12 @@ export function PlayPage({ gameId }: PlayPageProps) {
     [game, selected]
   );
 
+  function playPresenterSfx(name: SfxName) {
+    if (isSoundEnabled) {
+      playSfx(name);
+    }
+  }
+
   function selectTarget(target: SelectedTarget) {
     if (completedIds.includes(selectedId(target))) {
       return;
@@ -172,6 +183,7 @@ export function PlayPage({ gameId }: PlayPageProps) {
 
     setSelected(target);
     setPhase("board");
+    playPresenterSfx("open");
   }
 
   function scoreSelected(direction: 1 | -1) {
@@ -183,6 +195,12 @@ export function PlayPage({ gameId }: PlayPageProps) {
       ...currentScores,
       [activeTeamId]: (currentScores[activeTeamId] ?? 0) + selectedContent.points * direction
     }));
+  }
+
+  function completeSelected(direction: 1 | -1, sfxName: Extract<SfxName, "correct" | "wrong">) {
+    scoreSelected(direction);
+    playPresenterSfx(sfxName);
+    returnToBoard();
   }
 
   function returnToBoard() {
@@ -212,9 +230,17 @@ export function PlayPage({ gameId }: PlayPageProps) {
   }
 
   return (
-    <section className="presenter-shell" aria-labelledby="play-title">
+    <section
+      className="presenter-shell"
+      aria-labelledby="play-title"
+      data-fullscreen={isFullscreen ? "true" : "false"}
+      ref={presenterRef}
+    >
       <header className="presenter-header">
-        <h1 id="play-title">{game.title}</h1>
+        <div>
+          <p className="stage-label">Projektorový režim</p>
+          <h1 id="play-title">{game.title}</h1>
+        </div>
         <section className="scoreboard" aria-label="Skóre týmů" role="region">
           {game.teams.map((team) => (
             <div key={team.id} className="scoreboard-team">
@@ -223,6 +249,23 @@ export function PlayPage({ gameId }: PlayPageProps) {
             </div>
           ))}
         </section>
+        <div className="presenter-controls" aria-label="Ovládání prezentace">
+          <button
+            className="presenter-control-button"
+            disabled={!isSupported}
+            type="button"
+            onClick={toggleFullscreen}
+          >
+            {isFullscreen ? "Ukončit celou obrazovku" : "Celá obrazovka"}
+          </button>
+          <button
+            className="presenter-control-button"
+            type="button"
+            onClick={() => setIsSoundEnabled((current) => !current)}
+          >
+            {isSoundEnabled ? "Zvuk zapnutý" : "Zvuk vypnutý"}
+          </button>
+        </div>
       </header>
 
       <div className="presenter-board">
@@ -398,10 +441,10 @@ export function PlayPage({ gameId }: PlayPageProps) {
                   ))}
                 </select>
               </label>
-              <button type="button" onClick={() => scoreSelected(1)}>
+              <button type="button" onClick={() => completeSelected(1, "correct")}>
                 Správně
               </button>
-              <button type="button" onClick={() => scoreSelected(-1)}>
+              <button type="button" onClick={() => completeSelected(-1, "wrong")}>
                 Špatně
               </button>
               <button type="button" onClick={returnToBoard}>

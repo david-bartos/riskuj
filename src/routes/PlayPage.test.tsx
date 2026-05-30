@@ -9,8 +9,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { demoGame } from "../data/demoGame";
 import PlayPage from "./PlayPage";
 
+const playSfxMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../audio/sfx", () => ({
+  playSfx: playSfxMock
+}));
+
 describe("PlayPage", () => {
   beforeEach(() => {
+    playSfxMock.mockClear();
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
@@ -141,6 +148,60 @@ describe("PlayPage", () => {
     const scoreboard = screen.getByRole("region", { name: "Skóre týmů" });
     expect(within(scoreboard).getByText("Tým 1")).toBeInTheDocument();
     expect(within(scoreboard).getByText("100")).toBeInTheDocument();
+  });
+
+  it("přehraje zvuk při otevření otázky a správném vyhodnocení", async () => {
+    render(<PlayPage gameId="demo-hudebni-riskuj" />);
+
+    await screen.findByRole("heading", { name: demoGame.title });
+    fireEvent.click(screen.getByRole("button", { name: /České hity za 100/i }));
+
+    expect(playSfxMock).toHaveBeenCalledWith("open");
+
+    fireEvent.keyDown(window, { key: "Enter" });
+    fireEvent.keyDown(window, { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: "Správně" }));
+
+    expect(playSfxMock).toHaveBeenCalledWith("correct");
+    expect(
+      screen.getByRole("button", { name: /České hity za 100/i })
+    ).toBeDisabled();
+  });
+
+  it("přehraje zvuk při špatném vyhodnocení", async () => {
+    render(<PlayPage gameId="demo-hudebni-riskuj" />);
+
+    await screen.findByRole("heading", { name: demoGame.title });
+    fireEvent.click(screen.getByRole("button", { name: /Zahraniční rock za 200/i }));
+    fireEvent.keyDown(window, { key: "Enter" });
+    fireEvent.keyDown(window, { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: "Špatně" }));
+
+    expect(playSfxMock).toHaveBeenCalledWith("wrong");
+    expect(
+      screen.getByRole("button", { name: /Zahraniční rock za 200/i })
+    ).toBeDisabled();
+  });
+
+  it("umí vypnout zvukové efekty pro moderátora", async () => {
+    render(<PlayPage gameId="demo-hudebni-riskuj" />);
+
+    await screen.findByRole("heading", { name: demoGame.title });
+    fireEvent.click(screen.getByRole("button", { name: "Zvuk zapnutý" }));
+    fireEvent.click(screen.getByRole("button", { name: /České hity za 200/i }));
+
+    expect(playSfxMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Zvuk vypnutý" })).toBeInTheDocument();
+  });
+
+  it("zobrazí ovládání celé obrazovky v češtině", async () => {
+    render(<PlayPage gameId="demo-hudebni-riskuj" />);
+
+    await screen.findByRole("heading", { name: demoGame.title });
+
+    expect(
+      screen.getByRole("button", { name: "Celá obrazovka" })
+    ).toBeInTheDocument();
   });
 
   it("neumožní znovu vybrat dokončenou položku z tabule", async () => {
