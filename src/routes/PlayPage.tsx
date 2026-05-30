@@ -100,6 +100,8 @@ function PresenterView({ game }: { game: Game }) {
   useEffect(() => {
     function handleEnter(event: KeyboardEvent) {
       if (event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
         flow.advance();
       }
     }

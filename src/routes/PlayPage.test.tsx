@@ -62,6 +62,24 @@ describe("PlayPage", () => {
     expect(screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i })).toBeDisabled();
   });
 
+  it("Enter po kliknutí na focused dlaždici zůstane na otázce a nevybere dlaždici znovu", async () => {
+    render(<PlayPage gameId="riskuj-2026-06-06" />);
+
+    await screen.findByRole("heading", { name: demoGame.title });
+    const tile = screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i });
+    fireEvent.click(tile);
+
+    expect(screen.getByText("Dlaždice je vybraná")).toBeInTheDocument();
+
+    const shouldRunDefaultAction = fireEvent.keyDown(tile, { key: "Enter" });
+    if (shouldRunDefaultAction) {
+      fireEvent.click(tile);
+    }
+
+    expect(await screen.findByText(/Legendární panák B 52/i)).toBeInTheDocument();
+    expect(screen.queryByText("Dlaždice je vybraná")).not.toBeInTheDocument();
+  });
+
   it("špatná odpověď skóre nemění", async () => {
     render(<PlayPage gameId="riskuj-2026-06-06" />);
 
