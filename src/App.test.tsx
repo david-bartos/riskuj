@@ -45,4 +45,14 @@ describe("App", () => {
       await screen.findByRole("heading", { name: "Editor hry" })
     ).toBeInTheDocument();
   });
+
+  it("zobrazí presenter na /play/:gameId", async () => {
+    window.history.pushState({}, "", "/play/demo-hudebni-riskuj");
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: demoGame.title })
+    ).toBeInTheDocument();
+  });
 });

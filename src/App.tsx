@@ -1,8 +1,15 @@
 import AdminPage from "./routes/AdminPage";
+import PlayPage from "./routes/PlayPage";
 
 export default function App() {
+  const playMatch = window.location.pathname.match(/^\/play\/([^/]+)$/);
+
   if (window.location.pathname === "/admin") {
     return <AdminPage />;
+  }
+
+  if (playMatch) {
+    return <PlayPage gameId={decodeURIComponent(playMatch[1])} />;
   }
 
   return (

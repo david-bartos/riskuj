@@ -195,3 +195,153 @@ h1 {
   margin: 0;
   color: #d9e7ff;
 }
+
+.presenter-shell {
+  width: min(100%, 86rem);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.presenter-header {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.presenter-header h1 {
+  font-size: clamp(2rem, 5vw, 4rem);
+}
+
+.scoreboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.75rem;
+}
+
+.scoreboard-team {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  background: rgba(3, 19, 48, 0.62);
+}
+
+.scoreboard-team strong {
+  color: #f8d866;
+}
+
+.presenter-board {
+  display: grid;
+  gap: 1rem;
+}
+
+.round-section {
+  padding: 1rem 0;
+}
+
+.round-section h2,
+.presenter-panel h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.4rem;
+}
+
+.question-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+}
+
+.question-column {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.question-column h3 {
+  margin: 0;
+  color: #f8d866;
+  font-size: 1rem;
+}
+
+.tile-button,
+.scoring-controls button {
+  min-height: 3rem;
+  border: 1px solid rgba(248, 216, 102, 0.55);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  color: #06142e;
+  background: #f8d866;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tile-button[aria-disabled="true"] {
+  opacity: 0.48;
+}
+
+.presenter-panel {
+  margin-top: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 1rem;
+  background: rgba(3, 19, 48, 0.72);
+}
+
+.presenter-panel p {
+  color: #f6f8ff;
+  font-size: 1.1rem;
+  line-height: 1.55;
+}
+
+.presenter-panel audio {
+  width: 100%;
+  margin-top: 0.75rem;
+}
+
+.answer-panel {
+  margin-top: 1rem;
+  border-left: 0.25rem solid #f8d866;
+  padding-left: 1rem;
+}
+
+.answer-panel h3 {
+  margin: 0 0 0.5rem;
+  color: #f8d866;
+}
+
+.clue-list {
+  display: grid;
+  gap: 0.75rem;
+  padding-left: 1.5rem;
+}
+
+.clue-list li {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.scoring-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.scoring-controls label {
+  display: grid;
+  gap: 0.35rem;
+  color: #d9e7ff;
+  font-weight: 700;
+}
+
+.scoring-controls select {
+  min-height: 3rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  color: #f6f8ff;
+  background: #08265b;
+}
