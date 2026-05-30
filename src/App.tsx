@@ -1,4 +1,10 @@
+import AdminPage from "./routes/AdminPage";
+
 export default function App() {
+  if (window.location.pathname === "/admin") {
+    return <AdminPage />;
+  }
+
   return (
     <main className="app-shell">
       <section className="intro-panel" aria-labelledby="app-title">
@@ -8,6 +14,10 @@ export default function App() {
           Základ aplikace je připravený pro herní tabuli, moderátorské ovládání
           a práci s hudebními ukázkami.
         </p>
+        <nav className="home-actions" aria-label="Rychlé odkazy">
+          <a href="/admin">Editor</a>
+          <a href="/play/demo-hudebni-riskuj">Spustit demo</a>
+        </nav>
       </section>
     </main>
   );
