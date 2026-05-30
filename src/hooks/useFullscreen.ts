@@ -9,6 +9,14 @@ type FullscreenControls = {
   toggleFullscreen: () => void;
 };
 
+type RuntimeDocument = Omit<Document, "exitFullscreen"> & {
+  exitFullscreen?: () => Promise<void>;
+};
+
+type RuntimeFullscreenElement = Omit<HTMLElement, "requestFullscreen"> & {
+  requestFullscreen?: () => Promise<void>;
+};
+
 function safelyRunFullscreen(promiseFactory: () => Promise<void> | void) {
   try {
     const result = promiseFactory();
@@ -26,13 +34,14 @@ function safelyRunFullscreen(promiseFactory: () => Promise<void> | void) {
 export function useFullscreen<T extends HTMLElement>(
   targetRef?: RefObject<T | null>
 ): FullscreenControls {
+  const fullscreenDocument = document as RuntimeDocument;
   const [fullscreenElement, setFullscreenElement] = useState<Element | null>(() =>
-    typeof document === "undefined" ? null : document.fullscreenElement
+    typeof document === "undefined" ? null : fullscreenDocument.fullscreenElement
   );
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setFullscreenElement(document.fullscreenElement);
+      setFullscreenElement(fullscreenDocument.fullscreenElement);
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -43,35 +52,38 @@ export function useFullscreen<T extends HTMLElement>(
   }, []);
 
   const enterFullscreen = useCallback(() => {
-    const element = targetRef?.current ?? document.documentElement;
+    const element = (targetRef?.current ?? document.documentElement) as RuntimeFullscreenElement;
+    const requestFullscreen = element.requestFullscreen;
 
-    if (!element.requestFullscreen) {
+    if (!requestFullscreen) {
       return;
     }
 
-    safelyRunFullscreen(() => element.requestFullscreen());
+    safelyRunFullscreen(() => requestFullscreen.call(element));
   }, [targetRef]);
 
   const exitFullscreen = useCallback(() => {
-    if (!document.fullscreenElement || !document.exitFullscreen) {
+    const exitFullscreenMethod = fullscreenDocument.exitFullscreen;
+
+    if (!fullscreenDocument.fullscreenElement || !exitFullscreenMethod) {
       return;
     }
 
-    safelyRunFullscreen(() => document.exitFullscreen());
-  }, []);
+    safelyRunFullscreen(() => exitFullscreenMethod.call(fullscreenDocument));
+  }, [fullscreenDocument]);
 
   const toggleFullscreen = useCallback(() => {
-    if (document.fullscreenElement) {
+    if (fullscreenDocument.fullscreenElement) {
       exitFullscreen();
       return;
     }
 
     enterFullscreen();
-  }, [enterFullscreen, exitFullscreen]);
+  }, [enterFullscreen, exitFullscreen, fullscreenDocument]);
 
-  const fullscreenTarget = targetRef?.current ?? document.documentElement;
+  const fullscreenTarget = (targetRef?.current ?? document.documentElement) as RuntimeFullscreenElement;
   const isSupported = Boolean(
-    fullscreenTarget.requestFullscreen && document.exitFullscreen
+    fullscreenTarget.requestFullscreen && fullscreenDocument.exitFullscreen
   );
 
   return useMemo(
