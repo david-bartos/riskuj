@@ -87,4 +87,49 @@ describe("App", () => {
       screen.getByRole("heading", { name: "Editor hry" })
     ).toBeInTheDocument();
   });
+
+  it("otevře vybranou otázku a odpověď nechá skrytou do odhalení", () => {
+    window.history.pushState({}, "", "/play/demo");
+
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "České hity, otázka za 100 bodů"
+      })
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "České hity za 100 bodů" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Který zpěvák proslavil píseň Jožin z bažin?")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Ukázka českého hitu")).toBeInTheDocument();
+    expect(screen.queryByText("Ivan Mládek")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Zobrazit odpověď" }));
+
+    expect(screen.getByText("Ivan Mládek")).toBeInTheDocument();
+  });
+
+  it("se vrátí na tabuli bez označení otázky jako použité", () => {
+    window.history.pushState({}, "", "/play/demo");
+
+    render(<App />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "České hity, otázka za 100 bodů"
+      })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Zpět na tabuli" }));
+
+    const tile = screen.getByRole("button", {
+      name: "České hity, otázka za 100 bodů"
+    });
+
+    expect(tile).toBeEnabled();
+    expect(tile).not.toHaveClass("board-tile-used");
+  });
 });
