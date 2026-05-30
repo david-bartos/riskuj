@@ -79,12 +79,17 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Uložit hru" })).toBeInTheDocument();
   });
 
-  it("zobrazí herní tabuli na /play/riskuj-2026-06-06", async () => {
+  it("zobrazí herní tabuli na /play bez běžné navigace okolo presenteru", async () => {
     window.history.pushState({}, "", "/play/riskuj-2026-06-06");
 
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "Riskuj!" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Hlavní navigace" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Domů" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Editor" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Riskuj 6.6" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("tablist", { name: "Kola soutěže" })).toHaveLength(1);
     expect(
       screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i })
     ).toBeInTheDocument();
