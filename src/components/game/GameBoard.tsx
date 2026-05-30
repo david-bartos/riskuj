@@ -5,7 +5,7 @@ import { ScoreTile, type ScoreTileState } from "./ScoreTile";
 
 type GameBoardProps = {
   game: Game;
-  currentQuestionId: string | null;
+  currentQuestionId?: string | null;
   revealedQuestionIds: string[];
   onSelectQuestion: (questionId: string) => void;
 };
@@ -16,7 +16,7 @@ function getQuestionKey(categoryId: string, points: QuestionPoints) {
 
 function getTileState(
   question: Question | undefined,
-  currentQuestionId: string | null,
+  currentQuestionId: string | null | undefined,
   revealedQuestionIds: Set<string>
 ): ScoreTileState {
   if (!question) {

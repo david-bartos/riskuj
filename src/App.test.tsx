@@ -1,31 +1,60 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import App from "./App";
 
 describe("App", () => {
-  it("zobrazí český titulek hudebního kvízu", () => {
+  afterEach(() => {
+    window.history.pushState({}, "", "/");
+    window.localStorage.clear();
+  });
+
+  it("zobrazí domovskou stránku s českými vstupy do hry", () => {
+    window.history.pushState({}, "", "/");
+
     render(<App />);
 
     expect(
-      screen.getByRole("heading", { name: "Riskuj — hudební kvíz" })
+      screen.getByRole("heading", { name: "Hudební RISKuj!" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Editor hry" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Spustit hru" })
     ).toBeInTheDocument();
   });
 
-  it("zobrazí demo herní tabuli na /play/demo", () => {
+  it("zobrazí placeholder editoru na /admin", () => {
+    window.history.pushState({}, "", "/admin");
+
+    render(<App />);
+
+    expect(
+      screen.getByRole("heading", { name: "Editor hry" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Zde vznikne administrační editor kol, kategorií a hudebních ukázek.")
+    ).toBeInTheDocument();
+  });
+
+  it("zobrazí herní tabuli na /play/demo", () => {
     window.history.pushState({}, "", "/play/demo");
 
     render(<App />);
 
     expect(
-      screen.getByRole("grid", { name: "Herní tabule Hudební Riskuj demo" })
+      screen.getByRole("heading", { name: "Herní tabule" })
     ).toBeInTheDocument();
-    expect(screen.getByText("České hity")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /za 100 bodů/ })).toHaveLength(
-      5
-    );
+    expect(screen.getByText("Kód hry: demo")).toBeInTheDocument();
+    expect(
+      screen.getByRole("grid", { name: "Herní tabule Hudební Riskuj" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "České hity za 100 bodů" })
+    ).toBeInTheDocument();
   });
 
-  it("kliknutí na dostupné políčko ho označí jako aktivní, ale nepoužité", () => {
+  it("po kliknutí označí políčko jako vybrané bez použití otázky", () => {
     window.history.pushState({}, "", "/play/demo");
 
     render(<App />);
@@ -34,16 +63,28 @@ describe("App", () => {
       screen.getByRole("button", { name: "České hity za 100 bodů" })
     );
 
-    const selectedTile = screen.getByRole("button", {
+    const activeTile = screen.getByRole("button", {
       name: "Vybráno: České hity za 100 bodů"
     });
 
-    expect(selectedTile).toHaveAttribute("data-state", "active");
-    expect(selectedTile).not.toBeDisabled();
+    expect(activeTile).toHaveAttribute("data-state", "active");
+    expect(activeTile).not.toBeDisabled();
     expect(
       screen.queryByRole("button", {
         name: "Použito: České hity za 100 bodů"
       })
     ).not.toBeInTheDocument();
+  });
+
+  it("naviguje z domovské stránky do editoru bez reloadu", () => {
+    window.history.pushState({}, "", "/");
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Editor hry" }));
+
+    expect(window.location.pathname).toBe("/admin");
+    expect(
+      screen.getByRole("heading", { name: "Editor hry" })
+    ).toBeInTheDocument();
   });
 });

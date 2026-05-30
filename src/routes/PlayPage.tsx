@@ -10,22 +10,23 @@ export function PlayPage({ gameId }: PlayPageProps) {
   const session = useGameSession(gameId);
 
   return (
-    <main className="app-shell app-shell--game">
-      <section className="play-header" aria-labelledby="play-title">
-        <p className="intro-kicker">Demo hra</p>
-        <h1 id="play-title">Herní tabule</h1>
-        <p className="intro-text">
-          Vyberte políčko s hodnotou. Použitá políčka zůstanou na tabuli
-          viditelná a ztlumená.
-        </p>
-      </section>
-
+    <section
+      className="page-panel page-panel-wide play-page"
+      aria-labelledby="play-title"
+    >
+      <p className="eyebrow">Demo hra</p>
+      <h1 id="play-title">Herní tabule</h1>
+      <p className="game-code">Kód hry: {gameId}</p>
+      <p className="page-copy">
+        Vyberte políčko s bodovou hodnotou. Použitá políčka zůstanou na tabuli
+        viditelná a ztlumená.
+      </p>
       <GameBoard
         game={demoGame}
         currentQuestionId={session.currentQuestionId}
         revealedQuestionIds={session.revealedQuestionIds}
         onSelectQuestion={session.selectTile}
       />
-    </main>
+    </section>
   );
 }
