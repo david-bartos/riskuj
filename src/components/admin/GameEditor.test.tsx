@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import GameEditor, { normalizeGame, prepareGameForSave } from "./GameEditor";
 import type { Game } from "../../types/game";
@@ -69,6 +69,53 @@ describe("GameEditor", () => {
 
     expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByText("Název hry nesmí být prázdný.")).toBeInTheDocument();
+  });
+
+  it("zobrazí ovládání pro JSON import a export", () => {
+    render(<GameEditor initialGame={gameFixture} onSave={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Exportovat JSON" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Importovat JSON hry")).toBeInTheDocument();
+  });
+
+  it("importuje JSON hru a předá ji k uložení", async () => {
+    const onSave = vi.fn();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<GameEditor initialGame={gameFixture} onSave={onSave} />);
+
+    const importedGame: Game = {
+      ...gameFixture,
+      id: "importovana-hra",
+      title: "Importovaná hra",
+      questions: [
+        {
+          ...gameFixture.questions[0],
+          id: "import-question-1",
+          prompt: "Importovaná otázka"
+        }
+      ]
+    };
+    const file = new File(
+      [
+        JSON.stringify({
+          format: "riskuj-game/v1",
+          exportedAt: "2026-05-30T12:00:00.000Z",
+          game: importedGame
+        })
+      ],
+      "hra.json",
+      { type: "application/json" }
+    );
+
+    fireEvent.change(screen.getByLabelText("Importovat JSON hry"), {
+      target: { files: [file] }
+    });
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledTimes(1);
+    });
+    expect(onSave.mock.calls[0][0].title).toBe("Importovaná hra");
+    expect(onSave.mock.calls[0][0].questions[0].prompt).toBe("Importovaná otázka");
   });
 
   it("uloží audio prvního kola do canonical rounds", () => {
