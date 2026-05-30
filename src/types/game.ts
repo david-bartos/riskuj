@@ -1,18 +1,20 @@
-export type GameRoundType = "question" | "listening" | "common-denominator";
-
+export type MoneyValue = 0 | 1000 | 3000 | 5000 | 10000;
+export type RoundType = "question" | "listening" | "common-denominator";
+export type GameRoundType = RoundType;
 export type QuestionPoints = number;
 
 export interface AudioAsset {
   id: string;
   src: string;
   title: string;
-  artist?: string;
+  fileName?: string;
+  mimeType?: string;
   durationSeconds?: number;
+  /** Existing admin/upload compatibility fields. */
   originalName?: string;
   displayName?: string;
-  mimeType?: "audio/mpeg";
-  /** Legacy/admin upload URL alias. */
   url?: string;
+  artist?: string;
 }
 
 export interface Team {
@@ -27,10 +29,13 @@ export interface QuestionCategory {
 }
 
 export type Category = QuestionCategory;
+export type ListeningCategory = QuestionCategory;
+export type ListeningGenre = QuestionCategory;
 
 export interface QuestionItem {
   id: string;
   categoryId: string;
+  value?: Exclude<MoneyValue, 0>;
   points: QuestionPoints;
   prompt: string;
   answer: string;
@@ -40,87 +45,93 @@ export interface QuestionItem {
 
 export type Question = QuestionItem;
 
-export interface ListeningCategory {
-  id: string;
-  title: string;
-}
-
-export type ListeningGenre = ListeningCategory;
-
 export interface ListeningItem {
   id: string;
+  genreId?: string;
   prompt: string;
+  artist?: string;
+  trackTitle?: string;
+  audio?: AudioAsset;
+  /** Existing admin/presenter compatibility fields. */
   answer: string;
   categoryId?: string;
   points?: QuestionPoints;
-  audio?: AudioAsset;
+  value?: Exclude<MoneyValue, 0>;
   moderatorNote?: string;
-  /** Admin editor compatibility fields. */
-  genreId?: string;
   title?: string;
-  artist?: string;
   audioUrl?: string;
-  /** PR #17 presenter compatibility fields. */
   trackTitleAnswer?: string;
   artistAnswer?: string;
 }
 
 export interface CommonDenominatorClue {
   id: string;
+  text?: string;
+  audio?: AudioAsset;
+  /** Existing admin compatibility fields. */
   order?: number;
   prompt?: string;
   answer?: string;
-  audio?: AudioAsset;
   moderatorNote?: string;
-  /** Admin editor compatibility field. */
-  text?: string;
+}
+
+export interface CommonDenominatorItem {
+  id: string;
+  title: string;
+  clues: CommonDenominatorClue[];
+  answer: string;
+  value: Exclude<MoneyValue, 0>;
+  hint?: string;
+  moderatorNote?: string;
 }
 
 export interface BaseRound {
   id: string;
   title: string;
-  type: GameRoundType;
+  type: RoundType;
 }
 
 export interface QuestionRound extends BaseRound {
   type: "question";
   categories: QuestionCategory[];
+  /** Legacy compatibility alias. */
   questions: QuestionItem[];
-  /** PR #17 compatibility alias. */
   items?: QuestionItem[];
 }
 
 export interface ListeningRound extends BaseRound {
   type: "listening";
+  genres?: QuestionCategory[];
+  items?: ListeningItem[];
+  /** Legacy compatibility aliases. */
   categories: ListeningCategory[];
   tracks: ListeningItem[];
-  /** PR #17 compatibility alias. */
-  items?: ListeningItem[];
 }
 
 export interface CommonDenominatorRound extends BaseRound {
   type: "common-denominator";
+  items?: CommonDenominatorItem[];
+  /** Legacy one-question projection used by the current admin/editor. */
   clues: CommonDenominatorClue[];
   answer: string;
   points?: QuestionPoints;
   moderatorNote?: string;
 }
 
-export type GameRound = QuestionRound | ListeningRound | CommonDenominatorRound;
-export type Round = GameRound;
+export type Round = QuestionRound | ListeningRound | CommonDenominatorRound;
+export type GameRound = Round;
 
 export interface Game {
   id: string;
   title: string;
   teams: Team[];
-  rounds: GameRound[];
+  rounds: Round[];
+  /** Existing persistence/editor metadata. */
   createdAt: string;
   updatedAt: string;
-  /** Legacy projection used by the current presenter/admin UI until it is fully migrated to rounds. */
+  /** Legacy projection used by editor modules until they fully migrate to rounds. */
   categories: Category[];
-  /** Legacy projection used by the current presenter/admin UI until it is fully migrated to rounds. */
   questions: Question[];
-  /** Admin editor compatibility fields for 2./3. kolo. */
   listeningGenres?: ListeningGenre[];
   listeningItems?: ListeningItem[];
   commonDenominator?: {
@@ -148,3 +159,10 @@ export interface GameSessionState {
   isFinished: boolean;
   isFinalized?: boolean;
 }
+
+export const listeningScoreOptions = [
+  { id: "none", label: "0 Kč", value: 0 },
+  { id: "artist", label: "Interpret", value: 1000 },
+  { id: "track", label: "Track", value: 3000 },
+  { id: "both", label: "Obojí", value: 5000 }
+] as const;
