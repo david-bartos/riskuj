@@ -1,0 +1,19 @@
+:root {
+  --color-bg-deep: #03123a;
+  --color-bg: #061b55;
+  --color-panel: #0b2d83;
+  --color-panel-strong: #1345b5;
+  --color-gold: #ffd24a;
+  --color-gold-soft: #ffe58a;
+  --color-orange: #ff8a1f;
+  --color-text: #fff8d8;
+  --color-muted: #c6d5ff;
+  --color-line: rgba(255, 210, 74, 0.42);
+  --shadow-stage: 0 2rem 6rem rgba(0, 0, 0, 0.42);
+  --shadow-gold: 0 0 2rem rgba(255, 210, 74, 0.35);
+  --font-display: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --space-page: clamp(1rem, 3vw, 3rem);
+  --size-title: clamp(2.6rem, 7vw, 6.5rem);
+  --size-copy: clamp(1.05rem, 2vw, 1.45rem);
+  --focus-ring: 0 0 0 4px rgba(255, 210, 74, 0.44);
+}
