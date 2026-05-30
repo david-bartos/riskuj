@@ -1122,6 +1122,9 @@ h4 {
   font-weight: 900;
   line-height: 1.15;
   cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: rgba(248, 216, 102, 0.28);
 }
 
 .tile-button[data-state="selected"] {
@@ -1208,6 +1211,9 @@ h4 {
   width: 100%;
   min-height: 4rem;
   font-size: clamp(1.25rem, 3vw, 2rem);
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: rgba(248, 216, 102, 0.28);
 }
 
 .answer-panel {
