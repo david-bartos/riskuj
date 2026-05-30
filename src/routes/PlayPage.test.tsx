@@ -28,10 +28,43 @@ describe("PlayPage", () => {
     vi.unstubAllGlobals();
   });
 
+
+  it("v presenteru ukazuje kompaktní horní lištu, datum, zpět a přepínače kol", async () => {
+    const onExit = vi.fn();
+    render(<PlayPage gameId="riskuj-2026-06-06" onExit={onExit} />);
+
+    await screen.findByRole("heading", { name: "Riskuj!" });
+    expect(screen.getByText("6.6.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Zpět ze hry" }));
+    expect(onExit).toHaveBeenCalledTimes(1);
+
+    const roundTabs = screen.getByRole("tablist", { name: "Kola soutěže" });
+    expect(within(roundTabs).getByRole("tab", { name: "1" })).toHaveAttribute("aria-selected", "true");
+    expect(within(roundTabs).getByRole("tab", { name: "2" })).toHaveAttribute("aria-selected", "false");
+    expect(within(roundTabs).getByRole("tab", { name: "3" })).toHaveAttribute("aria-selected", "false");
+  });
+
+  it("zobrazuje vždy jen jedno soutěžní kolo a přepíná ho tlačítky 1 2 3", async () => {
+    render(<PlayPage gameId="riskuj-2026-06-06" />);
+
+    await screen.findByRole("heading", { name: "Riskuj!" });
+    expect(screen.getByRole("heading", { name: /1\. kolo/i })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /2\. kolo/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /3\. kolo/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "2" }));
+    expect(screen.queryByRole("heading", { name: /1\. kolo/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /2\. kolo/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "3" }));
+    expect(screen.queryByRole("heading", { name: /2\. kolo/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /3\. kolo/i })).toBeInTheDocument();
+  });
+
   it("odpovědi nejsou v presenter DOM před explicitním odkrytím", async () => {
     render(<PlayPage gameId="riskuj-2026-06-06" />);
 
-    await screen.findByRole("heading", { name: demoGame.title });
+    await screen.findByRole("heading", { name: "Riskuj!" });
 
     expect(document.body.textContent).not.toContain("The B-52s");
     expect(document.body.textContent).not.toContain("Kate Bush");
@@ -42,7 +75,7 @@ describe("PlayPage", () => {
   it("první klik dlaždici ztmaví, druhý klik otevře otázku v dialogu a tlačítko odhalí odpověď", async () => {
     render(<PlayPage gameId="riskuj-2026-06-06" />);
 
-    await screen.findByRole("heading", { name: demoGame.title });
+    await screen.findByRole("heading", { name: "Riskuj!" });
     const tile = screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i });
 
     fireEvent.click(tile);
@@ -61,8 +94,10 @@ describe("PlayPage", () => {
     expect(await within(dialog).findByText(/The B-52s/i)).toBeInTheDocument();
 
     const team1Button = within(dialog).getByRole("button", {
-      name: "Přičíst Tým 1: 1 000 Kč"
+      name: "tým 1"
     });
+    expect(within(dialog).queryByText(/Přičíst Tým 1/i)).not.toBeInTheDocument();
+    expect(within(dialog).queryAllByRole("button", { name: /1 000 Kč/i })).toHaveLength(0);
     expect(team1Button).toHaveStyle({ backgroundColor: demoGame.teams[0].color });
     fireEvent.click(team1Button);
 
@@ -78,7 +113,7 @@ describe("PlayPage", () => {
   it("umožní označit otázku jako neuhodnutou a později opravit přiřazení jinému týmu", async () => {
     render(<PlayPage gameId="riskuj-2026-06-06" />);
 
-    await screen.findByRole("heading", { name: demoGame.title });
+    await screen.findByRole("heading", { name: "Riskuj!" });
     const tile = screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i });
 
     fireEvent.click(tile);
@@ -96,7 +131,7 @@ describe("PlayPage", () => {
     const correctionDialog = await screen.findByRole("dialog", { name: /Otázka za 1 000 Kč/i });
     expect(within(correctionDialog).getByText(/The B-52s/i)).toBeInTheDocument();
     fireEvent.click(
-      within(correctionDialog).getByRole("button", { name: "Přičíst Tým 2: 1 000 Kč" })
+      within(correctionDialog).getByRole("button", { name: "tým 2" })
     );
 
     expect(within(scoreboard).getByText("1 000 Kč")).toBeInTheDocument();
@@ -106,7 +141,7 @@ describe("PlayPage", () => {
   it("přeřazení správné odpovědi odečte body původnímu týmu a přičte je novému", async () => {
     render(<PlayPage gameId="riskuj-2026-06-06" />);
 
-    await screen.findByRole("heading", { name: demoGame.title });
+    await screen.findByRole("heading", { name: "Riskuj!" });
     const tile = screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i });
 
     fireEvent.click(tile);
@@ -115,7 +150,7 @@ describe("PlayPage", () => {
     fireEvent.click(
       within(await screen.findByRole("dialog", { name: /Otázka za 1 000 Kč/i })).getByRole(
         "button",
-        { name: "Přičíst Tým 1: 1 000 Kč" }
+        { name: "tým 1" }
       )
     );
 
@@ -123,7 +158,7 @@ describe("PlayPage", () => {
     fireEvent.click(
       within(await screen.findByRole("dialog", { name: /Otázka za 1 000 Kč/i })).getByRole(
         "button",
-        { name: "Přičíst Tým 2: 1 000 Kč" }
+        { name: "tým 2" }
       )
     );
 
@@ -135,7 +170,7 @@ describe("PlayPage", () => {
   it("Enter po kliknutí na focused dlaždici zůstane na otázce a nevybere dlaždici znovu", async () => {
     render(<PlayPage gameId="riskuj-2026-06-06" />);
 
-    await screen.findByRole("heading", { name: demoGame.title });
+    await screen.findByRole("heading", { name: "Riskuj!" });
     const tile = screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i });
     fireEvent.click(tile);
 
@@ -153,7 +188,7 @@ describe("PlayPage", () => {
   it("neuhodnutá otázka skóre nemění", async () => {
     render(<PlayPage gameId="riskuj-2026-06-06" />);
 
-    await screen.findByRole("heading", { name: demoGame.title });
+    await screen.findByRole("heading", { name: "Riskuj!" });
     fireEvent.click(screen.getByRole("button", { name: /Hudební otázky 1 za 10 000 Kč/i }));
     fireEvent.keyDown(window, { key: "Enter" });
     fireEvent.keyDown(window, { key: "Enter" });
@@ -166,7 +201,8 @@ describe("PlayPage", () => {
   it("poslech přehraje MP3 a odpověď odhalí až po Enter", async () => {
     render(<PlayPage gameId="riskuj-2026-06-06" />);
 
-    await screen.findByRole("heading", { name: demoGame.title });
+    await screen.findByRole("heading", { name: "Riskuj!" });
+    fireEvent.click(screen.getByRole("tab", { name: "2" }));
     fireEvent.click(screen.getAllByRole("button", { name: /80\. a 90\. léta: poslech/i })[0]);
     fireEvent.keyDown(window, { key: "Enter" });
 
@@ -185,7 +221,8 @@ describe("PlayPage", () => {
   it("společný jmenovatel odhalí finální odpověď až po Enter", async () => {
     render(<PlayPage gameId="riskuj-2026-06-06" />);
 
-    await screen.findByRole("heading", { name: demoGame.title });
+    await screen.findByRole("heading", { name: "Riskuj!" });
+    fireEvent.click(screen.getByRole("tab", { name: "3" }));
     fireEvent.click(screen.getByRole("button", { name: /Společný jmenovatel: Human/i }));
     fireEvent.keyDown(window, { key: "Enter" });
 

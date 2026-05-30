@@ -46,7 +46,7 @@ export default function App() {
   }
 
   if (route.name === "play") {
-    page = <PlayPage gameId={route.gameId} />;
+    page = <PlayPage gameId={route.gameId} onExit={() => navigate("/")} />;
   }
 
   return (

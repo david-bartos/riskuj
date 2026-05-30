@@ -82,7 +82,7 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: demoGame.title })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Riskuj!" })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i })
     ).toBeInTheDocument();

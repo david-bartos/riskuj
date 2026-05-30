@@ -20,6 +20,7 @@ import { listeningScoreOptions } from "../types/game";
 
 type PlayPageProps = {
   gameId: string;
+  onExit?: () => void;
 };
 
 type ActiveContent =
@@ -81,11 +82,19 @@ function AudioPlayer({ src }: { src: string }) {
   return <audio aria-label="Přehrát audio ukázku" controls src={src} />;
 }
 
-function PresenterView({ game }: { game: Game }) {
+function eventDateLabel(title: string) {
+  const match = title.match(/(\d{1,2})\.(\d{1,2})/);
+  return match ? `${match[1]}.${match[2]}.` : "";
+}
+
+function PresenterView({ game, onExit }: { game: Game; onExit?: () => void }) {
   const presenterRef = useRef<HTMLElement>(null);
   const { isFullscreen, isSupported, toggleFullscreen } = useFullscreen(presenterRef);
   const flow = usePresenterFlow(game);
-  const [isSoundEnabled, setIsSoundEnabled] = useState(true);
+  const [isSoundEnabled] = useState(true);
+  const [activeRoundIndex, setActiveRoundIndex] = useState(0);
+  const activeRound = game.rounds[activeRoundIndex] ?? game.rounds[0];
+  const dateLabel = eventDateLabel(game.title);
 
   const activeContent = useMemo(
     () =>
@@ -166,19 +175,7 @@ function PresenterView({ game }: { game: Game }) {
     return team?.color ? { backgroundColor: team.color } : undefined;
   }
 
-  function awardValueLabel(value: number) {
-    return formatMoney(value);
-  }
 
-  function markCorrect() {
-    flow.markQuestionCorrect();
-    playPresenterSfx("correct");
-  }
-
-  function markWrong() {
-    flow.markQuestionWrong();
-    playPresenterSfx("wrong");
-  }
 
   return (
     <section
@@ -187,125 +184,120 @@ function PresenterView({ game }: { game: Game }) {
       data-fullscreen={isFullscreen ? "true" : "false"}
       ref={presenterRef}
     >
-      <header className="presenter-header">
-        <div>
-          <p className="stage-label">Projektorový režim</p>
-          <h1 id="play-title">{game.title}</h1>
-        </div>
+      <header className="presenter-header presenter-header-compact">
+        <button
+          type="button"
+          className="presenter-exit-button"
+          aria-label="Zpět ze hry"
+          onClick={onExit ?? (() => window.history.back())}
+        >
+          ◀
+        </button>
+        <h1 id="play-title">Riskuj!</h1>
         <TeamScoreboard
           teams={game.teams}
           scores={flow.session.teamScores}
           activeTeamId={flow.session.activeTeamId}
           onSelectTeam={flow.selectTeam}
-          onAdjustScore={flow.adjustScore}
         />
-        <div className="presenter-controls" aria-label="Ovládání prezentace">
-          <button
-            className="presenter-control-button"
-            disabled={!isSupported}
-            type="button"
-            onClick={toggleFullscreen}
-          >
-            {isFullscreen ? "Ukončit celou obrazovku" : "Celá obrazovka"}
-          </button>
-          <button
-            className="presenter-control-button"
-            type="button"
-            onClick={() => setIsSoundEnabled((current) => !current)}
-          >
-            {isSoundEnabled ? "Zvuk zapnutý" : "Zvuk vypnutý"}
-          </button>
+        <div className="presenter-date" aria-label="Datum hry">
+          {dateLabel}
         </div>
       </header>
 
-      <div className="presenter-board">
-        {game.rounds.map((round) => {
-          if (round.type === "question") {
-            return (
-              <section className="round-section" key={round.id}>
-                <h2>{round.title}</h2>
-                <div className="question-grid">
-                  {round.categories.map((category) => (
-                    <div key={category.id} className="question-column">
-                      <h3>{category.title}</h3>
-                      {questionItems(round)
-                        .filter((item) => item.categoryId === category.id)
-                        .map((item) => {
-                          const isCompleted = flow.session.completedItemIds.includes(item.id);
-                          return (
-                            <button
-                              aria-disabled={false}
-                              className="tile-button"
-                              data-state={tileState(round.id, item.id)}
-                              style={tileStyle(item.id)}
-                              key={item.id}
-                              onClick={() => selectItem(round.id, round.type, item.id)}
-                              type="button"
-                            >
-                              {category.title} za {formatMoney(item.value ?? item.points)}
-                            </button>
-                          );
-                        })}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            );
-          }
+      <nav className="round-tabs" role="tablist" aria-label="Kola soutěže">
+        {game.rounds.map((round, index) => (
+          <button
+            type="button"
+            role="tab"
+            key={round.id}
+            aria-selected={index === activeRoundIndex}
+            className="round-tab-button"
+            onClick={() => setActiveRoundIndex(index)}
+          >
+            {index + 1}
+          </button>
+        ))}
+      </nav>
 
-          if (round.type === "listening") {
-            return (
-              <section className="round-section" key={round.id}>
-                <h2>{round.title}</h2>
-                <div className="question-grid">
-                  {listeningItems(round).map((item) => {
-                    const genre = (round.genres ?? round.categories).find(
-                      (candidate) => candidate.id === (item.genreId ?? item.categoryId)
-                    );
-                    const isCompleted = flow.session.completedItemIds.includes(item.id);
-                    return (
+      <div className="presenter-board" data-active-round={activeRound?.id}>
+        {activeRound?.type === "question" ? (
+          <section className="round-section" key={activeRound.id}>
+            <h2>{activeRound.title}</h2>
+            <div className="question-grid question-grid-compact">
+              {activeRound.categories.map((category) => (
+                <div key={category.id} className="question-column">
+                  <h3>{category.title}</h3>
+                  {questionItems(activeRound)
+                    .filter((item) => item.categoryId === category.id)
+                    .map((item) => (
                       <button
+                        aria-label={`${category.title} za ${formatMoney(item.value ?? item.points)}`}
                         aria-disabled={false}
                         className="tile-button"
-                        data-state={tileState(round.id, item.id)}
+                        data-state={tileState(activeRound.id, item.id)}
                         style={tileStyle(item.id)}
                         key={item.id}
-                        onClick={() => selectItem(round.id, round.type, item.id)}
+                        onClick={() => selectItem(activeRound.id, activeRound.type, item.id)}
                         type="button"
                       >
-                        {genre?.title ?? "Poslech"}: poslech
+                        {formatMoney(item.value ?? item.points)}
                       </button>
-                    );
-                  })}
+                    ))}
                 </div>
-              </section>
-            );
-          }
+              ))}
+            </div>
+          </section>
+        ) : null}
 
-          return (
-            <section className="round-section" key={round.id}>
-              <h2>{round.title}</h2>
-              <div className="question-grid">
-                {commonItems(round).map((item) => {
-                  const isCompleted = flow.session.completedItemIds.includes(item.id);
-                  return (
-                    <button
-                      aria-disabled={false}
-                      className="tile-button"
-                      data-state={tileState(round.id, item.id)}
-                      style={tileStyle(item.id)}
-                      key={item.id}
-                      onClick={() => selectItem(round.id, round.type, item.id)}
-                      type="button"
-                    >
-                      {item.title} za {formatMoney(item.value)}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })}
+        {activeRound?.type === "listening" ? (
+          <section className="round-section" key={activeRound.id}>
+            <h2>{activeRound.title}</h2>
+            <div className="question-grid listening-grid-compact">
+              {listeningItems(activeRound).map((item, index) => {
+                const genre = (activeRound.genres ?? activeRound.categories).find(
+                  (candidate) => candidate.id === (item.genreId ?? item.categoryId)
+                );
+                return (
+                  <button
+                    aria-label={`${genre?.title ?? "Poslech"}: poslech`}
+                    aria-disabled={false}
+                    className="tile-button"
+                    data-state={tileState(activeRound.id, item.id)}
+                    style={tileStyle(item.id)}
+                    key={item.id}
+                    onClick={() => selectItem(activeRound.id, activeRound.type, item.id)}
+                    type="button"
+                  >
+                    {index + 1}. {genre?.title ?? "Poslech"}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+
+        {activeRound?.type === "common-denominator" ? (
+          <section className="round-section" key={activeRound.id}>
+            <h2>{activeRound.title}</h2>
+            <div className="question-grid common-grid-compact">
+              {commonItems(activeRound).map((item, index) => (
+                <button
+                  aria-label={`${item.title} za ${formatMoney(item.value)}`}
+                  aria-disabled={false}
+                  className="tile-button"
+                  data-state={tileState(activeRound.id, item.id)}
+                  style={tileStyle(item.id)}
+                  key={item.id}
+                  onClick={() => selectItem(activeRound.id, activeRound.type, item.id)}
+                  type="button"
+                >
+                  {index + 1}. {formatMoney(item.value)}
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
 
       {activeContent && flow.session.presenterStep === "item-selected" ? (
@@ -378,7 +370,7 @@ function PresenterView({ game }: { game: Game }) {
                         style={{ backgroundColor: team.color }}
                         onClick={() => flow.awardActiveItemToTeam(team.id)}
                       >
-                        Přičíst {team.name}: {awardValueLabel(value)}
+                        {team.name.toLocaleLowerCase("cs-CZ")}
                       </button>
                     );
                   })}
@@ -426,7 +418,7 @@ function PresenterView({ game }: { game: Game }) {
                       style={{ backgroundColor: team.color }}
                       onClick={() => flow.awardCommonDenominator(team.id)}
                     >
-                      Přičíst {team.name}: {awardValueLabel(activeContent.item.value)}
+                      {team.name.toLocaleLowerCase("cs-CZ")}
                     </button>
                   ))}
                   <button type="button" className="no-award-button" onClick={flow.markActiveItemUnanswered}>
@@ -445,7 +437,7 @@ function PresenterView({ game }: { game: Game }) {
   );
 }
 
-export function PlayPage({ gameId }: PlayPageProps) {
+export function PlayPage({ gameId, onExit }: PlayPageProps) {
   const [game, setGame] = useState<Game | null>(null);
   const [error, setError] = useState("");
 
@@ -490,7 +482,7 @@ export function PlayPage({ gameId }: PlayPageProps) {
     );
   }
 
-  return <PresenterView game={game} />;
+  return <PresenterView game={game} onExit={onExit} />;
 }
 
 export default PlayPage;
