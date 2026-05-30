@@ -52,7 +52,9 @@ describe("GameBoard", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Zahraniční rock za 300 bodů" })
+      screen.getByRole("button", {
+        name: "Zahraniční rock, otázka za 300 bodů"
+      })
     );
 
     expect(onSelectQuestion).toHaveBeenCalledTimes(1);

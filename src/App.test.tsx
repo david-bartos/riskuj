@@ -50,25 +50,22 @@ describe("App", () => {
       screen.getByRole("grid", { name: "Herní tabule Hudební Riskuj" })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "České hity za 100 bodů" })
+      screen.getByRole("button", { name: "České hity, otázka za 100 bodů" })
     ).toBeInTheDocument();
   });
 
-  it("po kliknutí označí políčko jako vybrané bez použití otázky", () => {
+  it("po kliknutí otevře otázku bez označení jako použité", () => {
     window.history.pushState({}, "", "/play/demo");
 
     render(<App />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "České hity za 100 bodů" })
+      screen.getByRole("button", { name: "České hity, otázka za 100 bodů" })
     );
 
-    const activeTile = screen.getByRole("button", {
-      name: "Vybráno: České hity za 100 bodů"
-    });
-
-    expect(activeTile).toHaveAttribute("data-state", "active");
-    expect(activeTile).not.toBeDisabled();
+    expect(
+      screen.getByRole("heading", { name: "České hity za 100 bodů" })
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", {
         name: "Použito: České hity za 100 bodů"
