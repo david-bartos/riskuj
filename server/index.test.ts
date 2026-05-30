@@ -97,6 +97,20 @@ describe("server", () => {
     expect(response.body).toEqual(savedGame);
   });
 
+  it("odmítne kompletní POST payload s nebezpečným ID jako validační chybu", async () => {
+    const app = createServer({ gamesDirectory });
+
+    const response = await request(app)
+      .post("/api/games")
+      .send({ ...savedGame, id: "spatne.id" })
+      .expect(400);
+
+    expect(response.body).toEqual({
+      message: "Hru se nepodařilo uložit.",
+      details: ["ID hry smí obsahovat jen písmena, číslice, pomlčku a podtržítko."]
+    });
+  });
+
   it("uloží změnu hry přes PUT a aktualizuje updatedAt", async () => {
     const repository = new GamesRepository(gamesDirectory);
     await repository.save(savedGame);

@@ -60,6 +60,7 @@ export function createServer(options: CreateServerOptions = {}) {
         : createEmptyGame(readOptionalTitle(request.body));
 
       assertValidGame(game);
+      assertSafeGameId(game.id);
       const savedGame = await gamesRepository.save(game);
 
       response.status(201).json(savedGame);
@@ -129,6 +130,14 @@ function readOptionalTitle(value: unknown) {
 
 function readRouteId(value: string | string[] | undefined) {
   return typeof value === "string" ? value : "";
+}
+
+function assertSafeGameId(id: string) {
+  if (!isSafeGameId(id)) {
+    throw new GameValidationError([
+      "ID hry smí obsahovat jen písmena, číslice, pomlčku a podtržítko."
+    ]);
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
