@@ -53,6 +53,8 @@ export function createEmptyGame(title = "Nová hra", now = new Date().toISOStrin
     title: trimmedTitle,
     teams: [],
     rounds: [],
+    categories: [],
+    questions: [],
     createdAt: now,
     updatedAt: now
   };

@@ -5,7 +5,7 @@ export type QuestionPoints = number;
 export interface AudioAsset {
   id: string;
   src: string;
-  title?: string;
+  title: string;
   artist?: string;
   durationSeconds?: number;
 }
@@ -30,6 +30,9 @@ export interface QuestionItem {
   moderatorNote?: string;
   audio?: AudioAsset;
 }
+
+export type Category = QuestionCategory;
+export type Question = QuestionItem;
 
 export interface ListeningCategory {
   id: string;
@@ -87,6 +90,8 @@ export interface Game {
   rounds: GameRound[];
   createdAt: string;
   updatedAt: string;
+  categories: Category[];
+  questions: Question[];
 }
 
 export interface GameSummary {
@@ -98,10 +103,13 @@ export interface GameSummary {
 
 export interface GameSessionState {
   gameId: string;
-  revealedItemIds: string[];
+  revealedQuestionIds: string[];
+  currentQuestionId?: string;
+  revealedItemIds?: string[];
   currentRoundId?: string;
   currentItemId?: string;
   teamScores: Record<string, number>;
   activeTeamId?: string;
-  isFinalized: boolean;
+  isFinished: boolean;
+  isFinalized?: boolean;
 }

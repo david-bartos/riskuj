@@ -50,7 +50,17 @@ const validGame: Game = {
     }
   ],
   createdAt: "2026-05-30T00:00:00.000Z",
-  updatedAt: "2026-05-30T00:00:00.000Z"
+  updatedAt: "2026-05-30T00:00:00.000Z",
+  categories: [{ id: "music", title: "Hudba" }],
+  questions: [
+    {
+      id: "q-1",
+      categoryId: "music",
+      points: 100,
+      prompt: "Otázka?",
+      answer: "Odpověď"
+    }
+  ]
 };
 
 describe("validateGame", () => {

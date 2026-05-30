@@ -13,7 +13,9 @@ const gameA: Game = {
   teams: [],
   rounds: [],
   createdAt: "2026-05-30T10:00:00.000Z",
-  updatedAt: "2026-05-30T11:00:00.000Z"
+  updatedAt: "2026-05-30T11:00:00.000Z",
+  categories: [],
+  questions: []
 };
 
 const gameB: Game = {
@@ -30,7 +32,9 @@ const gameB: Game = {
     }
   ],
   createdAt: "2026-05-30T10:00:00.000Z",
-  updatedAt: "2026-05-30T12:00:00.000Z"
+  updatedAt: "2026-05-30T12:00:00.000Z",
+  categories: [],
+  questions: []
 };
 
 describe("GamesRepository", () => {

@@ -22,6 +22,18 @@ npm run dev:server
 
 Backend port lze změnit přes `PORT`, například `PORT=3101 npm run dev:server`.
 
+## Lokální data
+
+Runtime data jsou uložená v adresáři `data/`:
+
+- `data/games/` je připravené místo pro lokální herní data.
+- `data/uploads/` obsahuje nahrané audio soubory.
+
+Adresáře jsou v repozitáři držené přes `.gitkeep`, ale jejich runtime obsah je
+ignorovaný gitem. Nahraná MP3 se tedy necommitují.
+
+Uploadovaná audia jsou servírovaná relativně z `/uploads/<soubor>.mp3`.
+
 ## Kontroly kvality
 
 ```bash
@@ -41,4 +53,26 @@ Odpověď:
 
 ```json
 { "status": "ok" }
+```
+
+Upload MP3:
+
+```bash
+curl -F "file=@song.mp3;type=audio/mpeg" \
+  -F "title=Ukázka" \
+  http://localhost:3001/api/uploads/audio
+```
+
+Endpoint přijímá multipart pole `file` a volitelné textové pole `title`.
+Soubor je přijatý, pokud má MIME typ `audio/mpeg` nebo název končí na `.mp3`.
+Při chybě validace vrací `400` JSON error.
+
+Odpověď:
+
+```json
+{
+  "id": "audio-1710000000000-a1b2c3d4e5f6",
+  "src": "/uploads/audio-1710000000000-a1b2c3d4e5f6.mp3",
+  "title": "Ukázka"
+}
 ```

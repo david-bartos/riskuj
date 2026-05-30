@@ -13,18 +13,20 @@
   },
   "dependencies": {
     "express": "^4.21.2",
+    "multer": "^2.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
-    "@vitejs/plugin-react": "^4.3.4",
     "@types/express": "^5.0.0",
+    "@types/multer": "^2.1.0",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "@types/supertest": "^6.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
     "jsdom": "^25.0.1",
     "supertest": "^7.0.0",

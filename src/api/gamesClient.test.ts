@@ -7,6 +7,8 @@ const game: Game = {
   title: "Test hra",
   teams: [],
   rounds: [],
+  categories: [],
+  questions: [],
   createdAt: "2026-05-30T10:00:00.000Z",
   updatedAt: "2026-05-30T10:00:00.000Z"
 };

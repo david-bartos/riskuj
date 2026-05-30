@@ -1,7 +1,9 @@
-import type { Game, QuestionCategory, QuestionItem, Team } from "../types/game";
+import type { Game, Question, QuestionCategory, QuestionPoints, Team } from "../types/game";
 
-const points = [100, 200, 300, 400, 500];
+const demoAudioSrc = "/uploads/demo-placeholder.mp3";
 const demoTimestamp = "2026-05-30T00:00:00.000Z";
+
+const questionPoints: QuestionPoints[] = [100, 200, 300, 400, 500];
 
 const demoTeams: Team[] = [
   { id: "team-1", name: "Tým 1", color: "#d62828" },
@@ -20,72 +22,215 @@ const categories: QuestionCategory[] = [
   { id: "poznej-interpreta", title: "Poznej interpreta" }
 ];
 
-const questionMatrix: Array<Array<Omit<QuestionItem, "id" | "categoryId" | "points">>> = [
-  [
-    { prompt: "Který zpěvák proslavil píseň Lady Karneval?", answer: "Karel Gott" },
-    { prompt: "Jak se jmenuje kapela kolem Michala Malátného?", answer: "Chinaski" },
-    { prompt: "Kdo nazpíval hit Malá dáma?", answer: "Kabát" },
-    { prompt: "Která česká zpěvačka zpívá píseň Láska je láska?", answer: "Lucie Bílá" },
-    { prompt: "Která skupina vydala album Slunečnice?", answer: "Lucie" }
-  ],
-  [
-    { prompt: "Kdo je frontmanem skupiny U2?", answer: "Bono" },
-    { prompt: "Která kapela nahrála Smoke on the Water?", answer: "Deep Purple" },
-    { prompt: "Jak se jmenoval zpěvák skupiny Queen?", answer: "Freddie Mercury" },
-    { prompt: "Která skupina vydala album Nevermind?", answer: "Nirvana" },
-    { prompt: "Kdo hrál hlavní kytarový riff v Sweet Child O' Mine?", answer: "Slash" }
-  ],
-  [
-    { prompt: "Který skladatel je spojený s hudbou k filmu Titanic?", answer: "James Horner" },
-    { prompt: "Jaká píseň zazní ve filmu Bodyguard od Whitney Houston?", answer: "I Will Always Love You" },
-    { prompt: "Kdo složil hlavní motiv Star Wars?", answer: "John Williams" },
-    { prompt: "Ve kterém filmu zazní píseň Eye of the Tiger?", answer: "Rocky III" },
-    { prompt: "Který animovaný film proslavil píseň Let It Go?", answer: "Ledové království" }
-  ],
-  [
-    { prompt: "Která skupina zpívala Wonderwall?", answer: "Oasis" },
-    { prompt: "Kdo vydal hit ...Baby One More Time?", answer: "Britney Spears" },
-    { prompt: "Který rapper proslavil skladbu Gangsta's Paradise?", answer: "Coolio" },
-    { prompt: "Která dívčí skupina měla hit Wannabe?", answer: "Spice Girls" },
-    { prompt: "Kdo zpíval český hit Dlouhá noc?", answer: "Helena Vondráčková" }
-  ],
-  [
+const questions: Question[] = [
     {
-      prompt: "Poznej interpreta podle ukázky.",
-      answer: "Karel Gott",
-      audio: { id: "audio-karel-gott", src: "/uploads/karel-gott.mp3", title: "Ukázka 1" }
+      id: "ceske-hity-100",
+      categoryId: "ceske-hity",
+      points: questionPoints[0],
+      prompt: "Který zpěvák nazpíval píseň Lady Carneval?",
+      answer: "Karel Gott"
     },
     {
-      prompt: "Poznej interpreta podle ukázky.",
-      answer: "Queen",
-      audio: { id: "audio-queen", src: "/uploads/queen.mp3", title: "Ukázka 2" }
+      id: "ceske-hity-200",
+      categoryId: "ceske-hity",
+      points: questionPoints[1],
+      prompt: "Která skupina má hit Slunečný hrob?",
+      answer: "Blue Effect",
+      moderatorNote: "Uznat lze také název The Blue Effect.",
+      audio: {
+        id: "audio-ceske-hity-200",
+        src: demoAudioSrc,
+        title: "Ukázka českého hitu za 200 bodů",
+        durationSeconds: 20
+      }
     },
     {
-      prompt: "Poznej interpreta podle ukázky.",
-      answer: "Lucie",
-      audio: { id: "audio-lucie", src: "/uploads/lucie.mp3", title: "Ukázka 3" }
+      id: "ceske-hity-300",
+      categoryId: "ceske-hity",
+      points: questionPoints[2],
+      prompt: "Jak se jmenuje kapela spojená s písní Malá dáma?",
+      answer: "Kabát"
     },
     {
-      prompt: "Poznej interpreta podle ukázky.",
-      answer: "Nirvana",
-      audio: { id: "audio-nirvana", src: "/uploads/nirvana.mp3", title: "Ukázka 4" }
+      id: "ceske-hity-400",
+      categoryId: "ceske-hity",
+      points: questionPoints[3],
+      prompt: "Která zpěvačka proslavila píseň Lásko, voníš deštěm?",
+      answer: "Marie Rottrová"
     },
     {
-      prompt: "Poznej interpreta podle ukázky.",
-      answer: "Spice Girls",
-      audio: { id: "audio-spice-girls", src: "/uploads/spice-girls.mp3", title: "Ukázka 5" }
+      id: "ceske-hity-500",
+      categoryId: "ceske-hity",
+      points: questionPoints[4],
+      prompt: "Která skupina vydala píseň Šrouby do hlavy?",
+      answer: "Lucie"
+    },
+    {
+      id: "zahranicni-rock-100",
+      categoryId: "zahranicni-rock",
+      points: questionPoints[0],
+      prompt: "Která kapela nahrála píseň Bohemian Rhapsody?",
+      answer: "Queen"
+    },
+    {
+      id: "zahranicni-rock-200",
+      categoryId: "zahranicni-rock",
+      points: questionPoints[1],
+      prompt: "Kdo zpívá skladbu Born to Run?",
+      answer: "Bruce Springsteen"
+    },
+    {
+      id: "zahranicni-rock-300",
+      categoryId: "zahranicni-rock",
+      points: questionPoints[2],
+      prompt: "Která skupina má ve znaku blesk a píseň Highway to Hell?",
+      answer: "AC/DC",
+      audio: {
+        id: "audio-zahranicni-rock-300",
+        src: demoAudioSrc,
+        title: "Ukázka zahraničního rocku za 300 bodů",
+        durationSeconds: 18
+      }
+    },
+    {
+      id: "zahranicni-rock-400",
+      categoryId: "zahranicni-rock",
+      points: questionPoints[3],
+      prompt: "Kdo byl hlavním zpěvákem skupiny Nirvana?",
+      answer: "Kurt Cobain"
+    },
+    {
+      id: "zahranicni-rock-500",
+      categoryId: "zahranicni-rock",
+      points: questionPoints[4],
+      prompt: "Která skupina vydala album The Dark Side of the Moon?",
+      answer: "Pink Floyd"
+    },
+    {
+      id: "filmova-hudba-100",
+      categoryId: "filmova-hudba",
+      points: questionPoints[0],
+      prompt: "Kdo složil hlavní motiv filmové série Star Wars?",
+      answer: "John Williams"
+    },
+    {
+      id: "filmova-hudba-200",
+      categoryId: "filmova-hudba",
+      points: questionPoints[1],
+      prompt: "Z jakého filmu pochází píseň My Heart Will Go On?",
+      answer: "Titanic"
+    },
+    {
+      id: "filmova-hudba-300",
+      categoryId: "filmova-hudba",
+      points: questionPoints[2],
+      prompt: "Který český film proslavil píseň Holubí dům v podání Jiřího Schelingera?",
+      answer: "Třicet panen a Pythagoras",
+      moderatorNote: "Stačí přesný název filmu."
+    },
+    {
+      id: "filmova-hudba-400",
+      categoryId: "filmova-hudba",
+      points: questionPoints[3],
+      prompt: "Kdo složil hudbu k filmu Pán prstenů: Společenstvo Prstenu?",
+      answer: "Howard Shore",
+      audio: {
+        id: "audio-filmova-hudba-400",
+        src: demoAudioSrc,
+        title: "Ukázka filmové hudby za 400 bodů",
+        durationSeconds: 22
+      }
+    },
+    {
+      id: "filmova-hudba-500",
+      categoryId: "filmova-hudba",
+      points: questionPoints[4],
+      prompt: "Který skladatel je autorem hudby k filmu Tenkrát na Západě?",
+      answer: "Ennio Morricone"
+    },
+    {
+      id: "devadesatky-100",
+      categoryId: "devadesatky",
+      points: questionPoints[0],
+      prompt: "Která dívčí skupina zpívala hit Wannabe?",
+      answer: "Spice Girls"
+    },
+    {
+      id: "devadesatky-200",
+      categoryId: "devadesatky",
+      points: questionPoints[1],
+      prompt: "Která česká skupina vydala píseň František?",
+      answer: "Buty"
+    },
+    {
+      id: "devadesatky-300",
+      categoryId: "devadesatky",
+      points: questionPoints[2],
+      prompt: "Kdo zpíval hit ...Baby One More Time?",
+      answer: "Britney Spears",
+      audio: {
+        id: "audio-devadesatky-300",
+        src: demoAudioSrc,
+        title: "Ukázka devadesátek za 300 bodů",
+        durationSeconds: 19
+      }
+    },
+    {
+      id: "devadesatky-400",
+      categoryId: "devadesatky",
+      points: questionPoints[3],
+      prompt: "Která kapela měla hit Smells Like Teen Spirit?",
+      answer: "Nirvana"
+    },
+    {
+      id: "devadesatky-500",
+      categoryId: "devadesatky",
+      points: questionPoints[4],
+      prompt: "Jak se jmenovalo debutové album skupiny Oasis z roku 1994?",
+      answer: "Definitely Maybe"
+    },
+    {
+      id: "poznej-interpreta-100",
+      categoryId: "poznej-interpreta",
+      points: questionPoints[0],
+      prompt: "Poznej interpreta podle nápovědy: slovenský zpěvák, hit Atlantida a výrazný hlas.",
+      answer: "Miro Žbirka"
+    },
+    {
+      id: "poznej-interpreta-200",
+      categoryId: "poznej-interpreta",
+      points: questionPoints[1],
+      prompt: "Poznej interpreta podle nápovědy: klavír, brýle a píseň Your Song.",
+      answer: "Elton John"
+    },
+    {
+      id: "poznej-interpreta-300",
+      categoryId: "poznej-interpreta",
+      points: questionPoints[2],
+      prompt: "Poznej interpreta podle nápovědy: bílá rukavice, moonwalk a album Thriller.",
+      answer: "Michael Jackson",
+      audio: {
+        id: "audio-poznej-interpreta-300",
+        src: demoAudioSrc,
+        title: "Ukázka interpreta za 300 bodů",
+        durationSeconds: 16
+      }
+    },
+    {
+      id: "poznej-interpreta-400",
+      categoryId: "poznej-interpreta",
+      points: questionPoints[3],
+      prompt: "Poznej interpreta podle nápovědy: skupina Pražský výběr a výrazný hlas v písni Pražákům, těm je tu hej.",
+      answer: "Michael Kocáb"
+    },
+    {
+      id: "poznej-interpreta-500",
+      categoryId: "poznej-interpreta",
+      points: questionPoints[4],
+      prompt: "Poznej interpreta podle nápovědy: Island, experimentální pop a album Debut.",
+      answer: "Björk"
     }
-  ]
 ];
-
-const questions: QuestionItem[] = categories.flatMap((category, categoryIndex) =>
-  points.map((pointValue, pointIndex) => ({
-    id: `${category.id}-${pointValue}`,
-    categoryId: category.id,
-    points: pointValue,
-    ...questionMatrix[categoryIndex][pointIndex]
-  }))
-);
 
 export const demoGame: Game = {
   id: "demo-hudebni-riskuj",
@@ -101,7 +246,9 @@ export const demoGame: Game = {
     }
   ],
   createdAt: demoTimestamp,
-  updatedAt: demoTimestamp
+  updatedAt: demoTimestamp,
+  categories,
+  questions
 };
 
-export { points as demoQuestionPoints };
+export { questionPoints as demoQuestionPoints };
