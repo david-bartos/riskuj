@@ -182,7 +182,7 @@ export function PlayPage({ gameId }: PlayPageProps) {
     }
 
     setSelected(target);
-    setPhase("board");
+    setPhase("prompt");
     playPresenterSfx("open");
   }
 
