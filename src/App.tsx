@@ -1,4 +1,10 @@
+import AdminPage from "./routes/AdminPage";
+
 export default function App() {
+  if (window.location.pathname === "/admin") {
+    return <AdminPage />;
+  }
+
   return (
     <main className="app-shell">
       <section className="intro-panel" aria-labelledby="app-title">
