@@ -58,6 +58,32 @@ describe("server", () => {
     await request(app).get(uploadResponse.body.src).expect(200);
   });
 
+  it("ukládá nahrané MP3 pod neprůhledným názvem bez původního názvu skladby v URL", async () => {
+    const app = await createTestApp();
+
+    const uploadResponse = await request(app)
+      .post("/api/audio-assets")
+      .attach("file", Buffer.from("fake mp3 bytes"), {
+        filename: "Queen - Bohemian Rhapsody.mp3",
+        contentType: "audio/mpeg"
+      })
+      .expect(201);
+
+    expect(uploadResponse.body).toMatchObject({
+      originalName: "Queen - Bohemian Rhapsody.mp3",
+      mimeType: "audio/mpeg"
+    });
+    expect(uploadResponse.body.src).toMatch(
+      /^\/uploads\/[0-9a-f-]{36}\.mp3$/
+    );
+    expect(uploadResponse.body.src.toLowerCase()).not.toContain("queen");
+    expect(uploadResponse.body.src.toLowerCase()).not.toContain(
+      "bohemian-rhapsody"
+    );
+
+    await request(app).get(uploadResponse.body.src).expect(200);
+  });
+
   it("odmítne ne-MP3 upload", async () => {
     const app = await createTestApp();
 

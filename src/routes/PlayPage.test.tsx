@@ -79,6 +79,49 @@ describe("PlayPage", () => {
     expect(screen.getByText(/Queen/i)).toBeInTheDocument();
   });
 
+  it("před odhalením odpovědi nevykreslí původní název uploadu do audio src", async () => {
+    const gameWithUploadedAudio = structuredClone(demoGame);
+    const listeningRound = gameWithUploadedAudio.rounds.find(
+      (round) => round.type === "listening"
+    );
+    if (!listeningRound || listeningRound.type !== "listening") {
+      throw new Error("Missing listening round in test fixture");
+    }
+
+    listeningRound.items[0] = {
+      ...listeningRound.items[0],
+      audio: {
+        id: "uploaded-secret-track",
+        src: "/uploads/11111111-1111-4111-8111-111111111111.mp3",
+        originalName: "Queen - Bohemian Rhapsody.mp3",
+        displayName: "Hudební ukázka",
+        mimeType: "audio/mpeg"
+      },
+      trackTitleAnswer: "Bohemian Rhapsody",
+      artistAnswer: "Queen"
+    };
+
+    vi.mocked(fetch).mockImplementationOnce(async () =>
+      Response.json(gameWithUploadedAudio)
+    );
+
+    render(<PlayPage gameId="demo-hudebni-riskuj" />);
+
+    await screen.findByRole("heading", { name: demoGame.title });
+    fireEvent.click(screen.getByRole("button", { name: /Poslech za 100/i }));
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    const audio = await screen.findByLabelText("Přehrát audio ukázku");
+    expect(audio).toHaveAttribute(
+      "src",
+      "/uploads/11111111-1111-4111-8111-111111111111.mp3"
+    );
+    expect(audio.getAttribute("src")?.toLowerCase()).not.toContain("queen");
+    expect(audio.getAttribute("src")?.toLowerCase()).not.toContain("bohemian");
+    expect(document.body.textContent).not.toContain("Queen");
+    expect(document.body.textContent).not.toContain("Bohemian Rhapsody");
+  });
+
   it("umožní ručně přičíst body vybranému týmu po odhalení odpovědi", async () => {
     render(<PlayPage gameId="demo-hudebni-riskuj" />);
 

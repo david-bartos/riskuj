@@ -45,17 +45,6 @@ function isGame(value: unknown): value is Game {
   );
 }
 
-function sanitizeMp3FileName(originalName: string) {
-  const parsed = path.parse(originalName);
-  const baseName = parsed.name
-    .normalize("NFKD")
-    .replace(/[^\w-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 72);
-
-  return `${baseName || "audio"}.mp3`;
-}
-
 export function createServer(options: ServerOptions = {}) {
   const app = express();
   const dataDir = options.dataDir ?? path.join(process.cwd(), "server", "data");
@@ -75,11 +64,8 @@ export function createServer(options: ServerOptions = {}) {
     destination: (_request, _file, callback) => {
       callback(null, uploadsDir);
     },
-    filename: (_request, file, callback) => {
-      callback(
-        null,
-        `${crypto.randomUUID()}-${sanitizeMp3FileName(file.originalname)}`
-      );
+    filename: (_request, _file, callback) => {
+      callback(null, `${crypto.randomUUID()}.mp3`);
     }
   });
 
