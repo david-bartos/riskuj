@@ -123,6 +123,16 @@ function finalPlacements(
   return placements.sort((left, right) => right.rank - left.rank);
 }
 
+function isInteractiveElement(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(
+    target.closest("button, input, textarea, select, a[href], [role='button'], [contenteditable='true']")
+  );
+}
+
 function PresenterView({
   game,
   isActive = true,
@@ -210,17 +220,17 @@ function PresenterView({
       return undefined;
     }
 
-    function handleEnter(event: KeyboardEvent) {
-      if (event.key === "Enter") {
+    function handleAdvanceKey(event: KeyboardEvent) {
+      if ((event.key === "Enter" || event.key === " ") && !isInteractiveElement(event.target)) {
         event.preventDefault();
         event.stopPropagation();
         advancePresenter();
       }
     }
 
-    window.addEventListener("keydown", handleEnter);
-    return () => window.removeEventListener("keydown", handleEnter);
-  }, [flow, activeContent, game, isActive]);
+    window.addEventListener("keydown", handleAdvanceKey);
+    return () => window.removeEventListener("keydown", handleAdvanceKey);
+  }, [flow, activeContent, game, isActive, isFinalDialogOpen, finalGroups, revealedFinalGroups]);
 
   function isActiveSelectedItem(roundId: string, itemId: string) {
     return (
@@ -579,13 +589,9 @@ function PresenterView({
                 <span key={index} />
               ))}
             </div>
-            <div className="presenter-dialog-content final-dialog-content">
-              <p className="stage-label">Vyhodnocení hry</p>
-              <h2 id="final-dialog-title">Konečné pořadí</h2>
+            <div className="presenter-dialog-content final-dialog-content" onClick={revealNextFinalGroup}>
+              <h2 id="final-dialog-title">VÍTĚZOVÉ A PORAŽENÍ</h2>
               <div className="final-placements" aria-live="polite">
-                {visibleFinalGroups.length === 0 ? (
-                  <p className="final-placeholder">Postupně odkryjte umístění od posledního místa.</p>
-                ) : null}
                 {visibleFinalGroups.map((group) => (
                   <article
                     className="final-placement-card"
@@ -673,6 +679,4 @@ export function PlayPage({ gameId, isActive = true, onExit }: PlayPageProps) {
 }
 
 export default PlayPage;
-
-
 
