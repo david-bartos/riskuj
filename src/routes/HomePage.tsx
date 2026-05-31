@@ -27,7 +27,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
           type="button"
           onClick={() => onNavigate("/play/riskuj-2026-06-06")}
         >
-          Spustit hru
+          Spustit novou hru
         </button>
       </div>
     </section>

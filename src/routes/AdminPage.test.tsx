@@ -247,14 +247,15 @@ describe("AdminPage", () => {
   });
 
   it("spustí test vybrané uložené hry", async () => {
-    const onNavigate = vi.fn();
+    const onStartGame = vi.fn();
 
-    render(<AdminPage onNavigate={onNavigate} />);
+    render(<AdminPage onStartGame={onStartGame} />);
 
     await screen.findByLabelText("Editor hry");
-    fireEvent.click(screen.getByRole("button", { name: "Spustit hru" }));
+    fireEvent.click(screen.getByRole("button", { name: "Spustit novou hru" }));
 
-    expect(onNavigate).toHaveBeenCalledWith("/play/admin-test");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(onStartGame).toHaveBeenCalledWith("admin-test");
   });
 
   it("nabídne návrat do rozehrané hry", async () => {
@@ -268,26 +269,24 @@ describe("AdminPage", () => {
     expect(onResumeGame).toHaveBeenCalledTimes(1);
   });
 
-  it("před spuštěním jiné hry varuje před nahrazením rozehraného průběhu", async () => {
-    const onNavigate = vi.fn();
-    const confirmSpy = vi
-      .spyOn(window, "confirm")
-      .mockReturnValueOnce(false)
-      .mockReturnValueOnce(true);
+  it("před spuštěním hry při rozehraném průběhu varuje před novým startem", async () => {
+    const onStartGame = vi.fn();
 
-    render(<AdminPage runningGameId="other-game" onNavigate={onNavigate} />);
+    render(<AdminPage runningGameId="admin-test" onStartGame={onStartGame} />);
 
     await screen.findByLabelText("Editor hry");
-    fireEvent.click(screen.getByRole("button", { name: "Spustit hru" }));
+    fireEvent.click(screen.getByRole("button", { name: "Spustit novou hru" }));
 
-    expect(confirmSpy).toHaveBeenCalledWith(
-      "Už je rozehraná jiná hra. Spuštěním nové hry se aktuální průběh nahradí. Pokračovat?"
-    );
-    expect(onNavigate).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("alertdialog", { name: "Opravdu chcete začít novou hru?" })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Návrat" }));
+    expect(onStartGame).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Spustit hru" }));
+    fireEvent.click(screen.getByRole("button", { name: "Spustit novou hru" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ano" }));
 
-    expect(onNavigate).toHaveBeenCalledWith("/play/admin-test");
+    expect(onStartGame).toHaveBeenCalledWith("admin-test");
   });
 
   it("u nové neuložené hry nechá spuštění testu vypnuté", async () => {
@@ -296,6 +295,6 @@ describe("AdminPage", () => {
     await screen.findByLabelText("Editor hry");
     fireEvent.click(screen.getByRole("button", { name: "Nová hra" }));
 
-    expect(screen.getByRole("button", { name: "Spustit hru" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Spustit novou hru" })).toBeDisabled();
   });
 });

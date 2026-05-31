@@ -24,7 +24,7 @@ Můžeš použít ChatGPT, Gemini, Claude nebo jiný LM nástroj k přípravě c
 4. Výsledek ulož jako soubor, například `moje-hra.json`.
 5. Otevři admin `http://localhost:5173/`, klikni `Importovat JSON` a vyber soubor.
 6. Nahraj chybějící MP3/WAV soubory přes `Upload audio`, nebo je nejdřív nahraj přes API a do JSONu vlož vrácené `/uploads/...` cesty.
-7. Klikni `Uložit hru` a potom `Spustit hru`.
+7. Klikni `Uložit hru` a potom `Spustit novou hru`.
 
 Krátký prompt pro LM nástroj:
 
@@ -206,7 +206,7 @@ BASIC_AUTH_PASSWORD=secret
 3. Nastav týmy, kola, otázky, poslechy, společný jmenovatel a zvukové efekty.
 4. Audio ukázky a efekty nahraj přes `Upload audio`, nebo přes API `/api/uploads/audio`.
 5. Klikni `Uložit hru`.
-6. Klikni `Spustit hru`, nebo otevři `/play/<gameId>`.
+6. Klikni `Spustit novou hru`, nebo otevři `/play/<gameId>`.
 
 Admin umí také `Exportovat JSON` a `Importovat JSON`. Import nahradí aktuálně otevřenou hru a hned ji uloží na server.
 

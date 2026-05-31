@@ -5,7 +5,7 @@ import type { AudioAsset, Game } from "../types/game";
 
 type AdminPageProps = {
   runningGameId?: string;
-  onNavigate?: (path: string) => void;
+  onStartGame?: (gameId: string) => void;
   onResumeGame?: () => void;
 };
 
@@ -28,7 +28,7 @@ function upsertSummary(summaries: GameSummary[], summary: GameSummary) {
   return summaries.map((current) => (current.id === summary.id ? summary : current));
 }
 
-export function AdminPage({ runningGameId = "", onNavigate, onResumeGame }: AdminPageProps) {
+export function AdminPage({ runningGameId = "", onStartGame, onResumeGame }: AdminPageProps) {
   const [games, setGames] = useState<GameSummary[]>([]);
   const [selectedGameId, setSelectedGameId] = useState("");
   const [game, setGame] = useState<Game | null>(null);
@@ -37,6 +37,7 @@ export function AdminPage({ runningGameId = "", onNavigate, onResumeGame }: Admi
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [pendingStartGameId, setPendingStartGameId] = useState("");
   const loadRequestId = useRef(0);
 
   useEffect(() => {
@@ -132,28 +133,31 @@ export function AdminPage({ runningGameId = "", onNavigate, onResumeGame }: Admi
     return asset;
   }
 
+  function startGame(gameId: string) {
+    if (!gameId) {
+      return;
+    }
+
+    if (onStartGame) {
+      onStartGame(gameId);
+      return;
+    }
+
+    const playPath = `/play/${encodeURIComponent(gameId)}`;
+    window.history.pushState({}, "", playPath);
+  }
+
   function handleStartTest() {
     if (!selectedGameId) {
       return;
     }
 
-    if (runningGameId && runningGameId !== selectedGameId) {
-      const shouldStart = window.confirm(
-        "Už je rozehraná jiná hra. Spuštěním nové hry se aktuální průběh nahradí. Pokračovat?"
-      );
-
-      if (!shouldStart) {
-        return;
-      }
-    }
-
-    const playPath = `/play/${encodeURIComponent(selectedGameId)}`;
-    if (onNavigate) {
-      onNavigate(playPath);
+    if (runningGameId) {
+      setPendingStartGameId(selectedGameId);
       return;
     }
 
-    window.history.pushState({}, "", playPath);
+    startGame(selectedGameId);
   }
 
   async function handleSave(nextGame: Game) {
@@ -227,9 +231,40 @@ export function AdminPage({ runningGameId = "", onNavigate, onResumeGame }: Admi
           </button>
         ) : null}
         <button type="button" disabled={!selectedGameId} onClick={handleStartTest}>
-          Spustit hru
+          Spustit novou hru
         </button>
       </section>
+
+      {pendingStartGameId ? (
+        <div className="presenter-dialog-backdrop admin-confirm-backdrop">
+          <section
+            aria-labelledby="start-game-confirm-title"
+            aria-modal="true"
+            className="presenter-dialog admin-confirm-dialog"
+            role="alertdialog"
+          >
+            <div className="presenter-dialog-content admin-confirm-content">
+              <h2 id="start-game-confirm-title">Opravdu chcete začít novou hru?</h2>
+              <p>Stávající rozehraný průběh se ukončí a začne vybraná hra.</p>
+            </div>
+            <div className="presenter-dialog-actions admin-confirm-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  const gameId = pendingStartGameId;
+                  setPendingStartGameId("");
+                  startGame(gameId);
+                }}
+              >
+                Ano
+              </button>
+              <button type="button" onClick={() => setPendingStartGameId("")}>
+                Návrat
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {isLoading ? <p role="status">Načítám hry...</p> : null}
       {error ? (

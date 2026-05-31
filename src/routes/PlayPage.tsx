@@ -23,6 +23,7 @@ type PlayPageProps = {
   gameId: string;
   isActive?: boolean;
   onExit?: () => void;
+  onFinish?: () => void;
 };
 
 type ActiveContent =
@@ -136,11 +137,13 @@ function isInteractiveElement(target: EventTarget | null) {
 function PresenterView({
   game,
   isActive = true,
-  onExit
+  onExit,
+  onFinish
 }: {
   game: Game;
   isActive?: boolean;
   onExit?: () => void;
+  onFinish?: () => void;
 }) {
   const presenterRef = useRef<HTMLElement>(null);
   const { isFullscreen, isSupported, toggleFullscreen } = useFullscreen(presenterRef);
@@ -185,6 +188,14 @@ function PresenterView({
     return activeContent.item.clues.every((clue) => flow.session.revealedClueIds.includes(clue.id));
   }
 
+  function advanceButtonLabel() {
+    if (activeContent?.type === "common-denominator" && !willRevealAnswerOnAdvance()) {
+      return "Zobrazit další nápovědu";
+    }
+
+    return "Zobrazit odpověď";
+  }
+
   function advancePresenter() {
     if (isFinalDialogOpen) {
       revealNextFinalGroup();
@@ -201,6 +212,9 @@ function PresenterView({
   }
 
   function openFinalDialog() {
+    if (onFinish) {
+      onFinish();
+    }
     setIsFinalDialogOpen(true);
     setRevealedFinalGroups(0);
   }
@@ -425,7 +439,7 @@ function PresenterView({
             <div className="question-grid common-grid-compact">
               {commonItems(activeRound).map((item, index) => (
                 <button
-                  aria-label={`${item.title} za ${formatMoney(item.value)}`}
+                  aria-label={`Společný jmenovatel ${index + 1} za ${formatMoney(item.value)}`}
                   aria-disabled={false}
                   className="tile-button"
                   data-state={tileState(activeRound.id, item.id)}
@@ -496,7 +510,7 @@ function PresenterView({
             <div className="presenter-dialog-actions">
               {!flow.answerVisible ? (
                 <button type="button" onClick={advancePresenter}>
-                  Zobrazit odpověď
+                  {advanceButtonLabel()}
                 </button>
               ) : null}
 
@@ -630,7 +644,7 @@ function PresenterView({
   );
 }
 
-export function PlayPage({ gameId, isActive = true, onExit }: PlayPageProps) {
+export function PlayPage({ gameId, isActive = true, onExit, onFinish }: PlayPageProps) {
   const [game, setGame] = useState<Game | null>(null);
   const [error, setError] = useState("");
 
@@ -675,8 +689,7 @@ export function PlayPage({ gameId, isActive = true, onExit }: PlayPageProps) {
     );
   }
 
-  return <PresenterView game={game} isActive={isActive} onExit={onExit} />;
+  return <PresenterView game={game} isActive={isActive} onExit={onExit} onFinish={onFinish} />;
 }
 
 export default PlayPage;
-

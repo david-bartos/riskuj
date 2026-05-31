@@ -79,7 +79,7 @@ function buttonTooltip(element: HTMLElement, label: string) {
   const knownActions: Record<string, string> = {
     "Nová hra": "Kliknutím založíte novou prázdnou hru v editoru. Uloží se až tlačítkem Uložit hru.",
     "Vrátit se do hry": "Kliknutím se vrátíte do rozehrané hry. Aktuální průběh hry zůstane zachovaný.",
-    "Spustit hru": "Kliknutím otevřete vybranou hru v herním režimu. Pokud běží jiná hra, aplikace se nejdřív zeptá na potvrzení.",
+    "Spustit novou hru": "Kliknutím otevřete vybranou hru v herním režimu. Pokud už běží jiná hra, potvrzení „Ano“ ukončí stávající průběh a začne novou hru; „Návrat“ vás nechá v adminu.",
     "Přidat kolo": "Kliknutím přidáte další podporované kolo do hry. Nové kolo se uloží až při uložení hry.",
     "Exportovat JSON": "Kliknutím stáhnete aktuální hru jako JSON soubor. Hodí se jako záloha nebo pro přenos zadání.",
     "Uložit hru": "Kliknutím uložíte aktuální úpravy hry na server. Po uložení ji můžete spustit v herním režimu.",

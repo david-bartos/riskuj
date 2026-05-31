@@ -5,14 +5,15 @@ import CommonDenominatorRoundScreen from "./CommonDenominatorRoundScreen";
 
 const item: CommonDenominatorItem = {
   id: "common-1",
-  title: "Sada 1",
+  title: "Společný jmenovatel: Queen",
   value: 5000,
   clues: [
     { id: "clue-1", text: "Bohemian Rhapsody" },
     { id: "clue-2", text: "Freddie Mercury" },
     { id: "clue-3", text: "We Will Rock You" }
   ],
-  answer: "Queen"
+  answer: "Queen",
+  hint: "Případně pustit tracky nebo napovědět interpreta podle moderátorského uvážení."
 };
 
 describe("CommonDenominatorRoundScreen", () => {
@@ -26,8 +27,10 @@ describe("CommonDenominatorRoundScreen", () => {
     );
 
     expect(screen.getByText("Bohemian Rhapsody")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Nápovědy" })).toBeInTheDocument();
     expect(screen.queryByText("Freddie Mercury")).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain("Queen");
+    expect(document.body.textContent).not.toContain("Případně pustit tracky");
   });
 
   it("po odkrytí zobrazí odpověď", () => {
@@ -40,5 +43,6 @@ describe("CommonDenominatorRoundScreen", () => {
     );
 
     expect(screen.getByText("Queen")).toBeInTheDocument();
+    expect(screen.queryByText(/Případně pustit tracky/)).not.toBeInTheDocument();
   });
 });
