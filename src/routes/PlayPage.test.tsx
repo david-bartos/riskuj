@@ -226,14 +226,19 @@ describe("PlayPage", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Konec" }));
-    const finalDialog = await screen.findByRole("dialog", { name: "Konečné pořadí" });
-    expect(within(finalDialog).getByText("Postupně odkryjte umístění od posledního místa.")).toBeInTheDocument();
+    const finalDialog = await screen.findByRole("dialog", { name: "VÍTĚZOVÉ A PORAŽENÍ" });
+    expect(within(finalDialog).getByRole("heading", { name: "VÍTĚZOVÉ A PORAŽENÍ" })).toBeInTheDocument();
 
-    fireEvent.click(within(finalDialog).getByRole("button", { name: "Odkrýt další umístění" }));
+    fireEvent.keyDown(window, { key: " " });
     expect(within(finalDialog).getByText("2. místo")).toBeInTheDocument();
     expect(within(finalDialog).getAllByText("0 Kč")).toHaveLength(1);
     expect(within(finalDialog).getByText("Tým 2")).toBeInTheDocument();
     expect(playSfxMock).toHaveBeenLastCalledWith(presenterEffects.placementRevealed);
+
+    const backButton = within(finalDialog).getByRole("button", { name: "Zpět na tabuli" });
+    backButton.focus();
+    fireEvent.keyDown(backButton, { key: " " });
+    expect(within(finalDialog).queryByText("1. místo")).not.toBeInTheDocument();
 
     fireEvent.click(within(finalDialog).getByRole("button", { name: "Odkrýt další umístění" }));
     expect(within(finalDialog).getByText("1. místo")).toBeInTheDocument();
@@ -375,4 +380,3 @@ describe("PlayPage", () => {
     expect(await screen.findByText("HUMAN")).toBeInTheDocument();
   });
 });
-
