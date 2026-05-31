@@ -11,10 +11,12 @@ describe("playSfx", () => {
 
   it("plays the mapped SFX file for a known name", () => {
     const play = vi.fn().mockResolvedValue(undefined);
-    const audioConstructor = vi.fn().mockImplementation((src: string) => ({
-      src,
-      play
-    }));
+    const audioConstructor = vi.fn().mockImplementation(function (src: string) {
+      return {
+        src,
+        play
+      };
+    });
     globalThis.Audio = audioConstructor as unknown as typeof Audio;
 
     playSfx("open");
@@ -25,10 +27,12 @@ describe("playSfx", () => {
 
   it("plays a game-configured MP3 path", () => {
     const play = vi.fn().mockResolvedValue(undefined);
-    const audioConstructor = vi.fn().mockImplementation((src: string) => ({
-      src,
-      play
-    }));
+    const audioConstructor = vi.fn().mockImplementation(function (src: string) {
+      return {
+        src,
+        play
+      };
+    });
     globalThis.Audio = audioConstructor as unknown as typeof Audio;
 
     playSfx("/uploads/custom-correct.mp3");
@@ -45,7 +49,9 @@ describe("playSfx", () => {
 
   it("does not throw or leak when play rejects", async () => {
     const play = vi.fn().mockRejectedValue(new Error("autoplay blocked"));
-    globalThis.Audio = vi.fn().mockImplementation(() => ({ play })) as unknown as typeof Audio;
+    globalThis.Audio = vi.fn().mockImplementation(function () {
+      return { play };
+    }) as unknown as typeof Audio;
 
     expect(() => playSfx("wrong")).not.toThrow();
 
@@ -54,7 +60,7 @@ describe("playSfx", () => {
   });
 
   it("does not throw when constructing audio throws synchronously", () => {
-    globalThis.Audio = vi.fn().mockImplementation(() => {
+    globalThis.Audio = vi.fn().mockImplementation(function () {
       throw new Error("missing codec");
     }) as unknown as typeof Audio;
 
@@ -62,11 +68,13 @@ describe("playSfx", () => {
   });
 
   it("does not throw when playing audio throws synchronously", () => {
-    globalThis.Audio = vi.fn().mockImplementation(() => ({
-      play: vi.fn(() => {
-        throw new Error("playback unavailable");
-      })
-    })) as unknown as typeof Audio;
+    globalThis.Audio = vi.fn().mockImplementation(function () {
+      return {
+        play: vi.fn(() => {
+          throw new Error("playback unavailable");
+        })
+      };
+    }) as unknown as typeof Audio;
 
     expect(() => playSfx("timeout")).not.toThrow();
   });
