@@ -276,7 +276,7 @@ export function createServer(options: CreateServerOptions = {}) {
   if (existsSync(staticDir)) {
     app.use(express.static(staticDir));
 
-    app.get("*", (request, response, next) => {
+    app.get(/.*/, (request, response, next) => {
       if (request.path.startsWith("/api/")) {
         next();
         return;
