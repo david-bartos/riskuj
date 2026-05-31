@@ -4,6 +4,7 @@ type LayoutProps = {
   children: ReactNode;
   currentPath: string;
   onNavigate: (path: string) => void;
+  showPlayShortcut?: boolean;
 };
 
 const navItems = [
@@ -12,7 +13,11 @@ const navItems = [
   { label: "Riskuj 6.6", path: "/play/riskuj-2026-06-06" }
 ];
 
-export function Layout({ children, currentPath, onNavigate }: LayoutProps) {
+export function Layout({ children, currentPath, onNavigate, showPlayShortcut = true }: LayoutProps) {
+  const visibleNavItems = showPlayShortcut
+    ? navItems
+    : navItems.filter((item) => !item.path.startsWith("/play/"));
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -21,10 +26,10 @@ export function Layout({ children, currentPath, onNavigate }: LayoutProps) {
           type="button"
           onClick={() => onNavigate("/")}
         >
-          Hudební RISKuj!
+          Riskuj!
         </button>
         <nav className="app-nav" aria-label="Hlavní navigace">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <button
               aria-current={currentPath === item.path ? "page" : undefined}
               className="nav-link"

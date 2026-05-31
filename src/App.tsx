@@ -46,11 +46,11 @@ export default function App() {
   }
 
   if (route.name === "play") {
-    page = <PlayPage gameId={route.gameId} />;
+    page = <PlayPage gameId={route.gameId} onExit={() => navigate("/")} />;
   }
 
   return (
-    <Layout currentPath={path} onNavigate={navigate}>
+    <Layout currentPath={path} onNavigate={navigate} showPlayShortcut={route.name !== "play"}>
       {page}
     </Layout>
   );

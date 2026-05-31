@@ -11,7 +11,8 @@ function createSession(game: Game): GameSession {
     presenterStep: "board",
     completedItemIds: [],
     revealedClueIds: [],
-    listeningScoringDraft: {}
+    listeningScoringDraft: {},
+    itemAwards: {}
   };
 }
 
@@ -114,6 +115,27 @@ export function usePresenterFlow(game: Game) {
     }));
   }, []);
 
+  const reopenItemForCorrection = useCallback(
+    (roundId: string, roundType: RoundType, itemId: string) => {
+      setSession((current) => {
+        const nextStep = roundType === "common-denominator" ? "answer-visible" : "answer-visible";
+        const item =
+          roundType === "common-denominator" ? commonDenominatorItem(game, roundId, itemId) : undefined;
+        const revealedClueIds = item?.clues.map((clue) => clue.id) ?? current.revealedClueIds;
+
+        return {
+          ...current,
+          activeRoundId: roundId,
+          activeItem: { roundId, roundType, itemId },
+          presenterStep: nextStep,
+          revealedClueIds,
+          listeningScoringDraft: {}
+        };
+      });
+    },
+    [game]
+  );
+
   const advance = useCallback(() => {
     setSession((current) => {
       if (!current.activeItem) {
@@ -168,31 +190,80 @@ export function usePresenterFlow(game: Game) {
     });
   }, [game]);
 
-  const markQuestionCorrect = useCallback(() => {
+  const awardActiveItemToTeam = useCallback(
+    (teamId: string) => {
+      setSession((current) => {
+        const activeItem = current.activeItem;
+        if (!activeItem) {
+          return current;
+        }
+
+        const value = itemValue(game, activeItem.roundId, activeItem.itemId);
+        const previousAward = current.itemAwards[activeItem.itemId];
+        const completedItemIds = current.completedItemIds.includes(activeItem.itemId)
+          ? current.completedItemIds
+          : [...current.completedItemIds, activeItem.itemId];
+
+        return {
+          ...current,
+          activeItem: undefined,
+          presenterStep: "board",
+          completedItemIds,
+          itemAwards: {
+            ...current.itemAwards,
+            [activeItem.itemId]: { teamId, value }
+          },
+          teamScores: current.teamScores.map((entry) => {
+            const removePrevious = previousAward?.teamId === entry.teamId ? previousAward.value : 0;
+            const addNext = entry.teamId === teamId ? value : 0;
+            return { ...entry, score: entry.score - removePrevious + addNext };
+          })
+        };
+      });
+    },
+    [game]
+  );
+
+  const markActiveItemUnanswered = useCallback(() => {
     setSession((current) => {
       const activeItem = current.activeItem;
-      if (!activeItem || !current.activeTeamId) {
+      if (!activeItem) {
         return current;
       }
 
       const value = itemValue(game, activeItem.roundId, activeItem.itemId);
+      const previousAward = current.itemAwards[activeItem.itemId];
+      const completedItemIds = current.completedItemIds.includes(activeItem.itemId)
+        ? current.completedItemIds
+        : [...current.completedItemIds, activeItem.itemId];
+
       return {
         ...current,
         activeItem: undefined,
         presenterStep: "board",
-        completedItemIds: current.completedItemIds.includes(activeItem.itemId)
-          ? current.completedItemIds
-          : [...current.completedItemIds, activeItem.itemId],
-        teamScores: current.teamScores.map((entry) =>
-          entry.teamId === current.activeTeamId ? { ...entry, score: entry.score + value } : entry
-        )
+        completedItemIds,
+        itemAwards: {
+          ...current.itemAwards,
+          [activeItem.itemId]: { value }
+        },
+        teamScores: current.teamScores.map((entry) => ({
+          ...entry,
+          score: entry.score - (previousAward?.teamId === entry.teamId ? previousAward.value : 0)
+        }))
       };
     });
   }, [game]);
 
+  const markQuestionCorrect = useCallback(() => {
+    const activeTeamId = session.activeTeamId;
+    if (activeTeamId) {
+      awardActiveItemToTeam(activeTeamId);
+    }
+  }, [awardActiveItemToTeam, session.activeTeamId]);
+
   const markQuestionWrong = useCallback(() => {
-    returnToBoard();
-  }, [returnToBoard]);
+    markActiveItemUnanswered();
+  }, [markActiveItemUnanswered]);
 
   const setListeningTeamScore = useCallback((teamId: string, value: MoneyValue) => {
     setSession((current) => ({
@@ -226,27 +297,9 @@ export function usePresenterFlow(game: Game) {
 
   const awardCommonDenominator = useCallback(
     (teamId: string) => {
-      setSession((current) => {
-        const activeItem = current.activeItem;
-        if (!activeItem) {
-          return current;
-        }
-
-        const value = itemValue(game, activeItem.roundId, activeItem.itemId);
-        return {
-          ...current,
-          activeItem: undefined,
-          presenterStep: "board",
-          completedItemIds: current.completedItemIds.includes(activeItem.itemId)
-            ? current.completedItemIds
-            : [...current.completedItemIds, activeItem.itemId],
-          teamScores: current.teamScores.map((entry) =>
-            entry.teamId === teamId ? { ...entry, score: entry.score + value } : entry
-          )
-        };
-      });
+      awardActiveItemToTeam(teamId);
     },
-    [game]
+    [awardActiveItemToTeam]
   );
 
   const activeRound = useMemo(
@@ -260,7 +313,10 @@ export function usePresenterFlow(game: Game) {
     activeRound,
     selectTeam,
     selectItem,
+    reopenItemForCorrection,
     advance,
+    awardActiveItemToTeam,
+    markActiveItemUnanswered,
     markQuestionCorrect,
     markQuestionWrong,
     adjustScore,
@@ -271,3 +327,5 @@ export function usePresenterFlow(game: Game) {
     returnToBoard
   };
 }
+
+

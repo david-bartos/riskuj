@@ -22,6 +22,11 @@ export interface ListeningScoringDraft {
   [teamId: string]: MoneyValue;
 }
 
+export interface ItemAward {
+  teamId?: string;
+  value: number;
+}
+
 export interface GameSession {
   gameId: string;
   teamScores: TeamSessionScore[];
@@ -32,4 +37,6 @@ export interface GameSession {
   completedItemIds: string[];
   revealedClueIds: string[];
   listeningScoringDraft: ListeningScoringDraft;
+  itemAwards: Record<string, ItemAward>;
 }
+

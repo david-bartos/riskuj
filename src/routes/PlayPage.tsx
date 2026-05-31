@@ -20,6 +20,7 @@ import { listeningScoreOptions } from "../types/game";
 
 type PlayPageProps = {
   gameId: string;
+  onExit?: () => void;
 };
 
 type ActiveContent =
@@ -81,11 +82,13 @@ function AudioPlayer({ src }: { src: string }) {
   return <audio aria-label="Přehrát audio ukázku" controls src={src} />;
 }
 
-function PresenterView({ game }: { game: Game }) {
+function PresenterView({ game, onExit }: { game: Game; onExit?: () => void }) {
   const presenterRef = useRef<HTMLElement>(null);
   const { isFullscreen, isSupported, toggleFullscreen } = useFullscreen(presenterRef);
   const flow = usePresenterFlow(game);
-  const [isSoundEnabled, setIsSoundEnabled] = useState(true);
+  const [isSoundEnabled] = useState(true);
+  const [activeRoundIndex, setActiveRoundIndex] = useState(0);
+  const activeRound = game.rounds[activeRoundIndex] ?? game.rounds[0];
 
   const activeContent = useMemo(
     () =>
@@ -100,6 +103,8 @@ function PresenterView({ game }: { game: Game }) {
   useEffect(() => {
     function handleEnter(event: KeyboardEvent) {
       if (event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
         flow.advance();
       }
     }
@@ -114,8 +119,43 @@ function PresenterView({ game }: { game: Game }) {
     }
   }
 
-  function selectItem(roundId: string, roundType: RoundType, itemId: string) {
+  function isActiveSelectedItem(roundId: string, itemId: string) {
+    return (
+      flow.session.presenterStep === "item-selected" &&
+      flow.session.activeItem?.roundId === roundId &&
+      flow.session.activeItem.itemId === itemId
+    );
+  }
+
+  function tileState(roundId: string, itemId: string) {
+    const award = flow.session.itemAwards[itemId];
+    if (award?.teamId) {
+      return "awarded";
+    }
+
+    if (award) {
+      return "unanswered";
+    }
+
     if (flow.session.completedItemIds.includes(itemId)) {
+      return "completed";
+    }
+
+    if (isActiveSelectedItem(roundId, itemId)) {
+      return "selected";
+    }
+
+    return "available";
+  }
+
+  function selectItem(roundId: string, roundType: RoundType, itemId: string) {
+    if (isActiveSelectedItem(roundId, itemId)) {
+      flow.advance();
+      return;
+    }
+
+    if (flow.session.completedItemIds.includes(itemId)) {
+      flow.reopenItemForCorrection(roundId, roundType, itemId);
       return;
     }
 
@@ -123,15 +163,13 @@ function PresenterView({ game }: { game: Game }) {
     playPresenterSfx("open");
   }
 
-  function markCorrect() {
-    flow.markQuestionCorrect();
-    playPresenterSfx("correct");
+  function tileStyle(itemId: string) {
+    const teamId = flow.session.itemAwards[itemId]?.teamId;
+    const team = game.teams.find((candidate) => candidate.id === teamId);
+    return team?.color ? { backgroundColor: team.color } : undefined;
   }
 
-  function markWrong() {
-    flow.markQuestionWrong();
-    playPresenterSfx("wrong");
-  }
+
 
   return (
     <section
@@ -140,222 +178,250 @@ function PresenterView({ game }: { game: Game }) {
       data-fullscreen={isFullscreen ? "true" : "false"}
       ref={presenterRef}
     >
-      <header className="presenter-header">
-        <div>
-          <p className="stage-label">Projektorový režim</p>
-          <h1 id="play-title">{game.title}</h1>
+      <header className="presenter-header presenter-header-compact">
+        <div className="presenter-title-row">
+          <h1 id="play-title">Riskuj!</h1>
+          <nav className="round-tabs" role="tablist" aria-label="Kola soutěže">
+            {game.rounds.map((round, index) => (
+              <button
+                type="button"
+                role="tab"
+                key={round.id}
+                aria-selected={index === activeRoundIndex}
+                className="round-tab-button"
+                onClick={() => setActiveRoundIndex(index)}
+              >
+                {index + 1}
+              </button>
+            ))}
+          </nav>
         </div>
         <TeamScoreboard
           teams={game.teams}
           scores={flow.session.teamScores}
           activeTeamId={flow.session.activeTeamId}
           onSelectTeam={flow.selectTeam}
-          onAdjustScore={flow.adjustScore}
         />
-        <div className="presenter-controls" aria-label="Ovládání prezentace">
-          <button
-            className="presenter-control-button"
-            disabled={!isSupported}
-            type="button"
-            onClick={toggleFullscreen}
-          >
-            {isFullscreen ? "Ukončit celou obrazovku" : "Celá obrazovka"}
-          </button>
-          <button
-            className="presenter-control-button"
-            type="button"
-            onClick={() => setIsSoundEnabled((current) => !current)}
-          >
-            {isSoundEnabled ? "Zvuk zapnutý" : "Zvuk vypnutý"}
-          </button>
-        </div>
       </header>
 
-      <div className="presenter-board">
-        {game.rounds.map((round) => {
-          if (round.type === "question") {
-            return (
-              <section className="round-section" key={round.id}>
-                <h2>{round.title}</h2>
-                <div className="question-grid">
-                  {round.categories.map((category) => (
-                    <div key={category.id} className="question-column">
-                      <h3>{category.title}</h3>
-                      {questionItems(round)
-                        .filter((item) => item.categoryId === category.id)
-                        .map((item) => {
-                          const isCompleted = flow.session.completedItemIds.includes(item.id);
-                          return (
-                            <button
-                              aria-disabled={isCompleted}
-                              className="tile-button"
-                              disabled={isCompleted}
-                              key={item.id}
-                              onClick={() => selectItem(round.id, round.type, item.id)}
-                              type="button"
-                            >
-                              {category.title} za {formatMoney(item.value ?? item.points)}
-                            </button>
-                          );
-                        })}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            );
-          }
-
-          if (round.type === "listening") {
-            return (
-              <section className="round-section" key={round.id}>
-                <h2>{round.title}</h2>
-                <div className="question-grid">
-                  {listeningItems(round).map((item) => {
-                    const genre = (round.genres ?? round.categories).find(
-                      (candidate) => candidate.id === (item.genreId ?? item.categoryId)
-                    );
-                    const isCompleted = flow.session.completedItemIds.includes(item.id);
-                    return (
+      <div className="presenter-board" data-active-round={activeRound?.id}>
+        {activeRound?.type === "question" ? (
+          <section className="round-section" key={activeRound.id}>
+            <h2>{activeRound.title}</h2>
+            <div className="question-grid question-grid-compact">
+              {activeRound.categories.map((category) => (
+                <div key={category.id} className="question-column">
+                  <h3>{category.title}</h3>
+                  {questionItems(activeRound)
+                    .filter((item) => item.categoryId === category.id)
+                    .map((item) => (
                       <button
-                        aria-disabled={isCompleted}
+                        aria-label={`${category.title} za ${formatMoney(item.value ?? item.points)}`}
+                        aria-disabled={false}
                         className="tile-button"
-                        disabled={isCompleted}
+                        data-state={tileState(activeRound.id, item.id)}
+                        style={tileStyle(item.id)}
                         key={item.id}
-                        onClick={() => selectItem(round.id, round.type, item.id)}
+                        onClick={() => selectItem(activeRound.id, activeRound.type, item.id)}
                         type="button"
                       >
-                        {genre?.title ?? "Poslech"}: poslech
+                        {formatMoney(item.value ?? item.points)}
+                      </button>
+                    ))}
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {activeRound?.type === "listening" ? (
+          <section className="round-section" key={activeRound.id}>
+            <h2>{activeRound.title}</h2>
+            <div className="question-grid listening-grid-compact">
+              {listeningItems(activeRound).map((item, index) => {
+                const genre = (activeRound.genres ?? activeRound.categories).find(
+                  (candidate) => candidate.id === (item.genreId ?? item.categoryId)
+                );
+                return (
+                  <button
+                    aria-label={`${genre?.title ?? "Poslech"}: poslech`}
+                    aria-disabled={false}
+                    className="tile-button"
+                    data-state={tileState(activeRound.id, item.id)}
+                    style={tileStyle(item.id)}
+                    key={item.id}
+                    onClick={() => selectItem(activeRound.id, activeRound.type, item.id)}
+                    type="button"
+                  >
+                    {index + 1}. {genre?.title ?? "Poslech"}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+
+        {activeRound?.type === "common-denominator" ? (
+          <section className="round-section" key={activeRound.id}>
+            <h2>{activeRound.title}</h2>
+            <div className="question-grid common-grid-compact">
+              {commonItems(activeRound).map((item, index) => (
+                <button
+                  aria-label={`${item.title} za ${formatMoney(item.value)}`}
+                  aria-disabled={false}
+                  className="tile-button"
+                  data-state={tileState(activeRound.id, item.id)}
+                  style={tileStyle(item.id)}
+                  key={item.id}
+                  onClick={() => selectItem(activeRound.id, activeRound.type, item.id)}
+                  type="button"
+                >
+                  {index + 1}. {formatMoney(item.value)}
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </div>
+
+      {activeContent && flow.session.presenterStep === "item-selected" ? (
+        <p className="selected-tile-status" aria-live="polite">
+          Dlaždice je vybraná
+        </p>
+      ) : null}
+
+      {activeContent && flow.session.presenterStep !== "item-selected" ? (
+        <div className="presenter-dialog-backdrop">
+          <section
+            className="presenter-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="presenter-dialog-title"
+          >
+            <div className="presenter-dialog-content">
+              {activeContent.type === "question" ? (
+                <>
+                  <h2 id="presenter-dialog-title">
+                    Otázka za {formatMoney(activeContent.item.value ?? activeContent.item.points)}
+                  </h2>
+                  <p>{activeContent.item.prompt}</p>
+                  {activeContent.item.audio ? <AudioPlayer src={activeContent.item.audio.src} /> : null}
+                  {flow.answerVisible ? (
+                    <div className="answer-panel">
+                      <h3>Odpověď</h3>
+                      <p>{activeContent.item.answer}</p>
+                      {activeContent.item.moderatorNote ? <p>{activeContent.item.moderatorNote}</p> : null}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+
+              {activeContent.type === "listening" ? (
+                <>
+                  <h2 id="presenter-dialog-title">Poslechová otázka</h2>
+                  <ListeningRoundScreen item={activeContent.item} answerVisible={flow.answerVisible} />
+                </>
+              ) : null}
+
+              {activeContent.type === "common-denominator" ? (
+                <>
+                  <h2 id="presenter-dialog-title">Společný jmenovatel</h2>
+                  <CommonDenominatorRoundScreen
+                    item={activeContent.item}
+                    visibleClueIds={flow.session.revealedClueIds}
+                    answerVisible={flow.answerVisible}
+                  />
+                </>
+              ) : null}
+            </div>
+
+            <div className="presenter-dialog-actions">
+              {!flow.answerVisible ? (
+                <button type="button" onClick={flow.advance}>
+                  Zobrazit odpověď
+                </button>
+              ) : null}
+
+              {flow.answerVisible && activeContent.type === "question" ? (
+                <div className="scoring-controls scoring-controls-teams">
+                  {game.teams.map((team) => {
+                    const value = activeContent.item.value ?? activeContent.item.points;
+                    return (
+                      <button
+                        type="button"
+                        key={team.id}
+                        className="team-award-button"
+                        style={{ backgroundColor: team.color }}
+                        onClick={() => flow.awardActiveItemToTeam(team.id)}
+                      >
+                        {team.name.toLocaleLowerCase("cs-CZ")}
                       </button>
                     );
                   })}
-                </div>
-              </section>
-            );
-          }
-
-          return (
-            <section className="round-section" key={round.id}>
-              <h2>{round.title}</h2>
-              <div className="question-grid">
-                {commonItems(round).map((item) => {
-                  const isCompleted = flow.session.completedItemIds.includes(item.id);
-                  return (
-                    <button
-                      aria-disabled={isCompleted}
-                      className="tile-button"
-                      disabled={isCompleted}
-                      key={item.id}
-                      onClick={() => selectItem(round.id, round.type, item.id)}
-                      type="button"
-                    >
-                      {item.title} za {formatMoney(item.value)}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })}
-      </div>
-
-      {activeContent ? (
-        <section className="presenter-panel" aria-label="Vybraná položka">
-          {flow.session.presenterStep === "item-selected" ? (
-            <p className="stage-label">Dlaždice je vybraná</p>
-          ) : null}
-
-          {activeContent.type === "question" &&
-          flow.session.presenterStep !== "item-selected" ? (
-            <>
-              <h2>Otázka za {formatMoney(activeContent.item.value ?? activeContent.item.points)}</h2>
-              <p>{activeContent.item.prompt}</p>
-              {activeContent.item.audio ? <AudioPlayer src={activeContent.item.audio.src} /> : null}
-              {flow.answerVisible ? (
-                <div className="answer-panel">
-                  <h3>Odpověď</h3>
-                  <p>{activeContent.item.answer}</p>
-                  {activeContent.item.moderatorNote ? <p>{activeContent.item.moderatorNote}</p> : null}
+                  <button type="button" className="no-award-button" onClick={flow.markActiveItemUnanswered}>
+                    Nikdo neuhodl
+                  </button>
+                  <button type="button" onClick={() => flow.returnToBoard()}>
+                    Zpět na tabuli
+                  </button>
                 </div>
               ) : null}
-            </>
-          ) : null}
 
-          {activeContent.type === "listening" &&
-          flow.session.presenterStep !== "item-selected" ? (
-            <ListeningRoundScreen item={activeContent.item} answerVisible={flow.answerVisible} />
-          ) : null}
+              {flow.answerVisible && activeContent.type === "listening" ? (
+                <div className="scoring-controls">
+                  {game.teams.map((team) => (
+                    <label className="field-stack" key={team.id}>
+                      <span>{team.name}</span>
+                      <select
+                        value={flow.session.listeningScoringDraft[team.id] ?? 0}
+                        onChange={(event) =>
+                          flow.setListeningTeamScore(team.id, Number(event.target.value) as 0)
+                        }
+                      >
+                        {listeningScoreOptions.map((option) => (
+                          <option key={option.id} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                  <button type="button" onClick={flow.applyListeningScores}>
+                    Zapsat poslechové body
+                  </button>
+                </div>
+              ) : null}
 
-          {activeContent.type === "common-denominator" &&
-          flow.session.presenterStep !== "item-selected" ? (
-            <CommonDenominatorRoundScreen
-              item={activeContent.item}
-              visibleClueIds={flow.session.revealedClueIds}
-              answerVisible={flow.answerVisible}
-            />
-          ) : null}
-
-          {flow.answerVisible && activeContent.type === "question" ? (
-            <div className="scoring-controls">
-              <button type="button" onClick={markCorrect}>
-                Správně
-              </button>
-              <button type="button" onClick={markWrong}>
-                Špatně
-              </button>
-              <button type="button" onClick={() => flow.returnToBoard()}>
-                Zpět na tabuli
-              </button>
+              {flow.answerVisible && activeContent.type === "common-denominator" ? (
+                <div className="scoring-controls scoring-controls-teams">
+                  {game.teams.map((team) => (
+                    <button
+                      type="button"
+                      key={team.id}
+                      className="team-award-button"
+                      style={{ backgroundColor: team.color }}
+                      onClick={() => flow.awardCommonDenominator(team.id)}
+                    >
+                      {team.name.toLocaleLowerCase("cs-CZ")}
+                    </button>
+                  ))}
+                  <button type="button" className="no-award-button" onClick={flow.markActiveItemUnanswered}>
+                    Nikdo neuhodl
+                  </button>
+                  <button type="button" onClick={() => flow.returnToBoard()}>
+                    Zpět na tabuli
+                  </button>
+                </div>
+              ) : null}
             </div>
-          ) : null}
-
-          {flow.answerVisible && activeContent.type === "listening" ? (
-            <div className="scoring-controls">
-              {game.teams.map((team) => (
-                <label className="field-stack" key={team.id}>
-                  <span>{team.name}</span>
-                  <select
-                    value={flow.session.listeningScoringDraft[team.id] ?? 0}
-                    onChange={(event) =>
-                      flow.setListeningTeamScore(team.id, Number(event.target.value) as 0)
-                    }
-                  >
-                    {listeningScoreOptions.map((option) => (
-                      <option key={option.id} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ))}
-              <button type="button" onClick={flow.applyListeningScores}>
-                Zapsat poslechové body
-              </button>
-            </div>
-          ) : null}
-
-          {flow.answerVisible && activeContent.type === "common-denominator" ? (
-            <div className="scoring-controls">
-              {game.teams.map((team) => (
-                <button
-                  type="button"
-                  key={team.id}
-                  onClick={() => flow.awardCommonDenominator(team.id)}
-                >
-                  Přičíst {team.name}
-                </button>
-              ))}
-              <button type="button" onClick={() => flow.returnToBoard()}>
-                Zpět na tabuli
-              </button>
-            </div>
-          ) : null}
-        </section>
+          </section>
+        </div>
       ) : null}
     </section>
   );
 }
 
-export function PlayPage({ gameId }: PlayPageProps) {
+export function PlayPage({ gameId, onExit }: PlayPageProps) {
   const [game, setGame] = useState<Game | null>(null);
   const [error, setError] = useState("");
 
@@ -400,7 +466,10 @@ export function PlayPage({ gameId }: PlayPageProps) {
     );
   }
 
-  return <PresenterView game={game} />;
+  return <PresenterView game={game} onExit={onExit} />;
 }
 
 export default PlayPage;
+
+
+

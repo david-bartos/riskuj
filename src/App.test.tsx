@@ -46,6 +46,8 @@ describe("App", () => {
     render(<App />);
 
     expect(screen.getByRole("heading", { name: "Hudební RISKuj!" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Riskuj!" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Hudební RISKuj!" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Editor hry" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Spustit hru" })).toBeInTheDocument();
   });
@@ -77,12 +79,17 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Uložit hru" })).toBeInTheDocument();
   });
 
-  it("zobrazí herní tabuli na /play/riskuj-2026-06-06", async () => {
+  it("zobrazí herní tabuli na /play bez redundantního odkazu na aktuální hru", async () => {
     window.history.pushState({}, "", "/play/riskuj-2026-06-06");
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: demoGame.title })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Riskuj!" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Hlavní navigace" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Domů" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Editor" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Riskuj 6.6" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("tablist", { name: "Kola soutěže" })).toHaveLength(1);
     expect(
       screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i })
     ).toBeInTheDocument();

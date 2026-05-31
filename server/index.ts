@@ -1,7 +1,7 @@
 import express from "express";
 import multer from "multer";
 import { randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -14,6 +14,7 @@ type CreateServerOptions = {
   gamesDirectory?: string;
   uploadsDir?: string;
   audioAssetsPath?: string;
+  staticDir?: string;
 };
 
 interface AudioUploadRequest extends express.Request {
@@ -22,6 +23,7 @@ interface AudioUploadRequest extends express.Request {
 
 const defaultUploadsDir = resolve(process.cwd(), "data", "uploads");
 const defaultAudioAssetsPath = resolve(process.cwd(), "data", "audio-assets.json");
+const defaultStaticDir = resolve(process.cwd(), "dist");
 const mp3UploadRequiredMessage = 'MP3 file is required in multipart field "file".';
 const invalidMp3Message = "Only MP3 audio uploads are supported.";
 
@@ -63,8 +65,15 @@ export function createServer(options: CreateServerOptions = {}) {
   const gamesRepository = new GamesRepository(options.gamesDirectory);
   const uploadsDir = options.uploadsDir ?? defaultUploadsDir;
   const audioAssetsPath = options.audioAssetsPath ?? defaultAudioAssetsPath;
+  const staticDir = options.staticDir ?? defaultStaticDir;
 
   mkdirSync(uploadsDir, { recursive: true });
+
+  app.get("/healthz", (_request, response) => {
+    response.type("text/plain").send("ok\n");
+  });
+
+  app.use(basicAuthMiddleware);
 
   async function readAudioAssets(): Promise<AudioAsset[]> {
     try {
@@ -240,6 +249,19 @@ export function createServer(options: CreateServerOptions = {}) {
   app.post("/api/audio-assets", handleAudioUpload(201));
   app.post("/api/uploads/audio", handleAudioUpload(200));
 
+  if (existsSync(staticDir)) {
+    app.use(express.static(staticDir));
+
+    app.get("*", (request, response, next) => {
+      if (request.path.startsWith("/api/")) {
+        next();
+        return;
+      }
+
+      response.sendFile(resolve(staticDir, "index.html"));
+    });
+  }
+
   app.use(
     (
       error: unknown,
@@ -261,6 +283,45 @@ export function createServer(options: CreateServerOptions = {}) {
   );
 
   return app;
+}
+
+function basicAuthMiddleware(
+  request: express.Request,
+  response: express.Response,
+  next: express.NextFunction
+) {
+  const expectedUser = process.env.BASIC_AUTH_USER;
+  const expectedPassword = process.env.BASIC_AUTH_PASSWORD;
+
+  if (!expectedUser || !expectedPassword) {
+    next();
+    return;
+  }
+
+  const authHeader = request.header("authorization") ?? "";
+  const [scheme, token] = authHeader.split(" ");
+
+  if (scheme !== "Basic" || !token) {
+    requestBasicAuth(response);
+    return;
+  }
+
+  const decoded = Buffer.from(token, "base64").toString("utf8");
+  const separatorIndex = decoded.indexOf(":");
+  const user = decoded.slice(0, separatorIndex);
+  const password = decoded.slice(separatorIndex + 1);
+
+  if (user !== expectedUser || password !== expectedPassword) {
+    requestBasicAuth(response);
+    return;
+  }
+
+  next();
+}
+
+function requestBasicAuth(response: express.Response) {
+  response.setHeader("WWW-Authenticate", 'Basic realm="Riskuj", charset="UTF-8"');
+  response.status(401).send("Authentication required");
 }
 
 function isFullGamePayload(value: unknown): value is Game {
