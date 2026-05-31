@@ -1,0 +1,30 @@
+name: Collaboration request
+description: Ask about collaborating on the project.
+title: "[Collaboration]: "
+labels: ["collaboration"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Collaboration idea
+      description: What would you like to help with or discuss?
+    validations:
+      required: true
+  - type: textarea
+    id: background
+    attributes:
+      label: Relevant background
+      description: Share links, experience, constraints, or context.
+  - type: dropdown
+    id: contribution_type
+    attributes:
+      label: Type of contribution
+      options:
+        - Code
+        - Design or UX
+        - Testing
+        - Documentation
+        - Game content
+        - Other
+    validations:
+      required: true

@@ -4,6 +4,16 @@ Hudební český kvíz pro moderovanou hru. Admin slouží k přípravě hry, pr
 
 Tento README je psaný pro lidi i pro LM agenty. Člověk podle něj rozjede aplikaci a připraví hru, agent podle něj dokáže vygenerovat správný importní JSON.
 
+## Legal and IP note
+
+This is an independent quiz-game application. It is not affiliated with,
+endorsed by, sponsored by, or connected to any television show, board game,
+publisher, broadcaster, rights holder, or trademark owner.
+
+The MIT License covers only the original source code and documentation in this
+repository. It does not grant rights to third-party trademarks, show names,
+game titles, audio, artwork, question packs, or other third-party content.
+
 ## For humans: create a game with ChatGPT, Gemini or Claude
 
 Můžeš použít ChatGPT, Gemini, Claude nebo jiný LM nástroj k přípravě celé hry. Nejjednodušší postup:
