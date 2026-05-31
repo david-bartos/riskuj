@@ -13,11 +13,16 @@ function getAudioLabel(audio: AudioAsset) {
   return audio.displayName ?? audio.title ?? audio.originalName ?? audio.src;
 }
 
-function isMp3File(file: File) {
+function isSupportedAudioFile(file: File) {
+  const lowerName = file.name.toLowerCase();
   return (
     file.type === "audio/mpeg" ||
     file.type === "audio/mp3" ||
-    file.name.toLowerCase().endsWith(".mp3")
+    file.type === "audio/wav" ||
+    file.type === "audio/wave" ||
+    file.type === "audio/x-wav" ||
+    lowerName.endsWith(".mp3") ||
+    lowerName.endsWith(".wav")
   );
 }
 
@@ -30,7 +35,6 @@ export default function AudioUploadField({
 }: AudioUploadFieldProps) {
   const selectId = useId();
   const uploadId = useId();
-  const alternateUploadId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadSequenceRef = useRef(0);
   const [status, setStatus] = useState("");
@@ -43,16 +47,16 @@ export default function AudioUploadField({
     setStatus("");
 
     if (!file) {
-      setError("Vyberte prosím MP3 soubor k nahrání.");
+      setError("Vyberte prosím audio soubor k nahrání.");
       return;
     }
 
-    if (!isMp3File(file)) {
-      setError("Nahrajte prosím soubor MP3.");
+    if (!isSupportedAudioFile(file)) {
+      setError("Nahrajte prosím soubor MP3 nebo WAV.");
       return;
     }
 
-    setStatus("Nahrávám MP3...");
+    setStatus("Nahrávám audio...");
 
     try {
       const asset = onUploadAudio ? await onUploadAudio(file) : await uploadAudioViaApi(file);
@@ -65,7 +69,7 @@ export default function AudioUploadField({
       if (uploadSequenceRef.current !== uploadSequence) {
         return;
       }
-      const message = uploadError instanceof Error ? uploadError.message : "MP3 se nepodařilo nahrát.";
+      const message = uploadError instanceof Error ? uploadError.message : "Audio se nepodařilo nahrát.";
       setStatus("");
       setError(message);
     } finally {
@@ -77,9 +81,10 @@ export default function AudioUploadField({
 
   return (
     <section className="audio-attachment" aria-label={label}>
+      <h3 className="audio-attachment-title">{label}</h3>
       <div className="editor-grid">
         <label className="field-stack" htmlFor={selectId}>
-          <span>Vybrat MP3 z knihovny</span>
+          <span>Vybrat audio z knihovny</span>
           <select
             id={selectId}
             value={audio?.id ?? ""}
@@ -101,20 +106,11 @@ export default function AudioUploadField({
         </label>
 
         <label className="field-stack" htmlFor={uploadId}>
-          <span>Nahrát MP3 k položce</span>
+          <span>Upload audio</span>
           <input
-            accept="audio/mpeg,.mp3"
+            accept=".mp3,.wav"
             id={uploadId}
             ref={inputRef}
-            type="file"
-            onChange={(event) => void handleUpload(event.target.files?.[0])}
-          />
-        </label>
-        <label className="field-stack sr-only" htmlFor={alternateUploadId}>
-          <span>MP3 soubor</span>
-          <input
-            accept="audio/mpeg,.mp3"
-            id={alternateUploadId}
             type="file"
             onChange={(event) => void handleUpload(event.target.files?.[0])}
           />
@@ -154,7 +150,7 @@ async function uploadAudioViaApi(file: File): Promise<AudioAsset> {
   });
 
   if (!response.ok) {
-    throw new Error("MP3 se nepodařilo nahrát.");
+    throw new Error("Audio se nepodařilo nahrát.");
   }
 
   return (await response.json()) as AudioAsset;

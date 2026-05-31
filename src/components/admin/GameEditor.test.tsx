@@ -39,7 +39,23 @@ const gameFixture: Game = {
   }
 };
 
+function switchEditorTab(name: string) {
+  fireEvent.click(screen.getByRole("tab", { name }));
+}
+
 describe("GameEditor", () => {
+  it("rozdělí editor do tabů pro nastavení a jednotlivá kola", () => {
+    render(<GameEditor initialGame={gameFixture} onSave={vi.fn()} />);
+
+    expect(screen.getByRole("tab", { name: "Nastavení" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "1. kolo" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "2. kolo" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "3. kolo" })).toBeInTheDocument();
+
+    switchEditorTab("1. kolo");
+    expect(screen.getByRole("heading", { name: "První kolo" })).toBeInTheDocument();
+  });
+
   it("umožní z prázdné hry přidat a uložit všechna tři kola", () => {
     const onSave = vi.fn();
     const emptyGame: Game = {
@@ -57,6 +73,7 @@ describe("GameEditor", () => {
 
     expect(screen.getAllByLabelText("Typ kola")).toHaveLength(3);
 
+    switchEditorTab("2. kolo");
     fireEvent.click(screen.getByRole("button", { name: "Přidat poslechový track" }));
     fireEvent.change(screen.getByLabelText("Žánr / sloupec"), { target: { value: "Pop" } });
     fireEvent.change(screen.getByLabelText("Interpret"), { target: { value: "Ewa Farna" } });
@@ -64,6 +81,7 @@ describe("GameEditor", () => {
       target: { value: "Měls mě vůbec rád" }
     });
 
+    switchEditorTab("3. kolo");
     fireEvent.click(screen.getByRole("button", { name: "Přidat položku" }));
     fireEvent.change(screen.getByLabelText("Clues"), {
       target: { value: "Queen\nABBA\nAqua" }
@@ -83,6 +101,52 @@ describe("GameEditor", () => {
       "listening",
       "common-denominator"
     ]);
+  });
+
+  it("po přidání všech tří podporovaných kol tlačítko jasně vypne", () => {
+    render(
+      <GameEditor
+        initialGame={{
+          id: "empty-game",
+          title: "Prázdná hra",
+          teams: [{ id: "team-a", name: "Tým A" }],
+          rounds: []
+        }}
+        onSave={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Přidat kolo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Přidat kolo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Přidat kolo" }));
+
+    expect(screen.getByRole("button", { name: "Přidat kolo" })).toBeDisabled();
+    expect(screen.getByText("Všechna podporovaná kola jsou přidaná.")).toBeInTheDocument();
+  });
+
+  it("uloží zapnutí a MP3 nastavení zvukových efektů hry", () => {
+    const onSave = vi.fn();
+    const effectAsset = {
+      id: "effect-selected",
+      src: "/uploads/effect-selected.mp3",
+      title: "effect-selected"
+    };
+
+    render(<GameEditor initialGame={gameFixture} audioAssets={[effectAsset]} onSave={onSave} />);
+
+    fireEvent.click(screen.getByLabelText("Zapnout efekty pro tuto hru"));
+    fireEvent.change(screen.getAllByLabelText("Vybrat audio z knihovny")[0], {
+      target: { value: "effect-selected" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Uložit hru" }));
+
+    const savedGame = onSave.mock.calls[0][0] as Game;
+    expect(savedGame.soundEffects).toEqual({
+      enabled: true,
+      effects: {
+        questionSelected: effectAsset
+      }
+    });
   });
 
   it("vytvoří poslechový track s audio assetem z prázdné hry", async () => {
@@ -113,6 +177,7 @@ describe("GameEditor", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Přidat kolo" }));
     fireEvent.change(screen.getByLabelText("Typ kola"), { target: { value: "listening" } });
+    switchEditorTab("2. kolo");
     fireEvent.click(screen.getByRole("button", { name: "Přidat poslechový track" }));
 
     fireEvent.change(screen.getByLabelText("Žánr / sloupec"), { target: { value: "Pop" } });
@@ -120,7 +185,7 @@ describe("GameEditor", () => {
     fireEvent.change(screen.getByLabelText("Název skladby"), {
       target: { value: "Měls mě vůbec rád" }
     });
-    fireEvent.change(screen.getByLabelText("MP3 soubor"), {
+    fireEvent.change(screen.getByLabelText("Upload audio"), {
       target: {
         files: [new File(["ID3"], "audio-test.mp3", { type: "audio/mpeg" })]
       }
@@ -159,6 +224,7 @@ describe("GameEditor", () => {
     fireEvent.change(screen.getByLabelText("Typ kola"), {
       target: { value: "common-denominator" }
     });
+    switchEditorTab("3. kolo");
     fireEvent.click(screen.getByRole("button", { name: "Přidat položku" }));
 
     fireEvent.change(screen.getByLabelText("Clues"), {
@@ -199,6 +265,7 @@ describe("GameEditor", () => {
     render(<GameEditor initialGame={gameFixture} onSave={onSave} />);
 
     expect(screen.getAllByLabelText(/Název týmu/i)).toHaveLength(6);
+    expect(screen.getByLabelText("Počet týmů")).toHaveValue(6);
 
     fireEvent.change(screen.getByDisplayValue("Tým 1"), {
       target: { value: "Hospoda Sever" }
@@ -210,8 +277,46 @@ describe("GameEditor", () => {
     expect(onSave.mock.calls[0][0].teams).toHaveLength(6);
   });
 
+  it("uloží přednastavený počet a názvy týmů", () => {
+    const onSave = vi.fn();
+    render(<GameEditor initialGame={gameFixture} onSave={onSave} />);
+
+    fireEvent.change(screen.getByLabelText("Počet týmů"), {
+      target: { value: "3" }
+    });
+    fireEvent.change(screen.getByDisplayValue("Tým 2"), {
+      target: { value: "Stůl u okna" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Uložit hru" }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0][0].teams).toHaveLength(3);
+    expect(onSave.mock.calls[0][0].teams[1].name).toBe("Stůl u okna");
+  });
+
+  it("načte uložený počet týmů bez doplnění na šest", () => {
+    render(
+      <GameEditor
+        initialGame={{
+          ...gameFixture,
+          teams: [
+            { id: "team-red", name: "Červení" },
+            { id: "team-blue", name: "Modří" },
+            { id: "team-green", name: "Zelení" }
+          ]
+        }}
+        onSave={vi.fn()}
+      />
+    );
+
+    expect(screen.getByLabelText("Počet týmů")).toHaveValue(3);
+    expect(screen.getAllByLabelText(/Název týmu/i)).toHaveLength(3);
+    expect(screen.getByDisplayValue("Červení")).toBeInTheDocument();
+  });
+
   it("umožní změnit text otázky prvního kola", () => {
     render(<GameEditor initialGame={gameFixture} onSave={vi.fn()} />);
+    switchEditorTab("1. kolo");
 
     const input = screen.getByLabelText("Zadání otázky 100 bodů v kategorii Pop");
     fireEvent.change(input, { target: { value: "Nová otázka" } });
@@ -222,6 +327,7 @@ describe("GameEditor", () => {
   it("při uložení předá upravenou hru", () => {
     const onSave = vi.fn();
     render(<GameEditor initialGame={gameFixture} onSave={onSave} />);
+    switchEditorTab("1. kolo");
 
     fireEvent.change(screen.getByLabelText("Zadání otázky 100 bodů v kategorii Pop"), {
       target: { value: "Nová otázka" }
@@ -397,6 +503,7 @@ describe("GameEditor", () => {
   it("umožní upravit a uložit všech 6 společných jmenovatelů ze seed hry", () => {
     const onSave = vi.fn();
     const { container } = render(<GameEditor initialGame={riskuj20260606Game} onSave={onSave} />);
+    switchEditorTab("3. kolo");
 
     const commonTitleInputs = Array.from(container.querySelectorAll("input")).filter((input) =>
       input.value.startsWith("Společný jmenovatel")

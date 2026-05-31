@@ -32,6 +32,20 @@ export interface Team {
   color?: string;
 }
 
+export type GameSoundEffectKey =
+  | "questionSelected"
+  | "questionOpened"
+  | "answerRevealed"
+  | "correctAnswer"
+  | "wrongAnswer"
+  | "placementRevealed"
+  | "firstPlaceRevealed";
+
+export interface GameSoundEffects {
+  enabled: boolean;
+  effects: Partial<Record<GameSoundEffectKey, AudioAsset>>;
+}
+
 export interface QuestionCategory {
   id: string;
   title: string;
@@ -153,6 +167,7 @@ export interface Game {
   /** Existing persistence/editor metadata. */
   createdAt?: string;
   updatedAt?: string;
+  soundEffects?: GameSoundEffects;
   /** Legacy projection used by editor modules until they fully migrate to rounds. */
   categories?: Category[];
   questions?: Question[];

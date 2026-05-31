@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { Team } from "../../types/game";
 import type { TeamSessionScore } from "../../types/session";
 
@@ -27,7 +28,12 @@ export function TeamScoreboard({
   onAdjustScore
 }: TeamScoreboardProps) {
   return (
-    <section className="team-scoreboard" aria-label="Skóre týmů" role="region">
+    <section
+      className="team-scoreboard"
+      aria-label="Skóre týmů"
+      role="region"
+      style={{ "--team-count": teams.length } as CSSProperties}
+    >
       {teams.map((team) => {
         const isActive = team.id === activeTeamId;
         return (

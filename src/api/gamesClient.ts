@@ -174,12 +174,18 @@ function createHttpError(response: Response, body: unknown) {
 
 function createUploadError(response: Response, body: unknown) {
   if (isBackendError(body)) {
-    if (body.error === "Only MP3 audio uploads are supported.") {
-      return new GamesClientError("Nahrajte prosím soubor MP3.", response.status);
+    if (
+      body.error === "Only MP3 or WAV audio uploads are supported." ||
+      body.error === "Only MP3 audio uploads are supported."
+    ) {
+      return new GamesClientError("Nahrajte prosím soubor MP3 nebo WAV.", response.status);
     }
 
-    if (body.error === 'MP3 file is required in multipart field "file".') {
-      return new GamesClientError("Vyberte prosím MP3 soubor k nahrání.", response.status);
+    if (
+      body.error === 'Audio file is required in multipart field "file".' ||
+      body.error === 'MP3 file is required in multipart field "file".'
+    ) {
+      return new GamesClientError("Vyberte prosím audio soubor k nahrání.", response.status);
     }
   }
 

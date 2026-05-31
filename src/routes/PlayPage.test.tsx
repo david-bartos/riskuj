@@ -9,19 +9,33 @@ vi.mock("../audio/sfx", () => ({
   playSfx: playSfxMock
 }));
 
+const presenterEffects = {
+  questionSelected: { id: "effect-select", src: "/uploads/effect-select.mp3", title: "select" },
+  questionOpened: { id: "effect-open", src: "/uploads/effect-open.mp3", title: "open" },
+  answerRevealed: { id: "effect-answer", src: "/uploads/effect-answer.mp3", title: "answer" },
+  correctAnswer: { id: "effect-correct", src: "/uploads/effect-correct.mp3", title: "correct" },
+  wrongAnswer: { id: "effect-wrong", src: "/uploads/effect-wrong.mp3", title: "wrong" },
+  placementRevealed: { id: "effect-place", src: "/uploads/effect-place.mp3", title: "place" },
+  firstPlaceRevealed: { id: "effect-first", src: "/uploads/effect-first.mp3", title: "first" }
+};
+
+function stubGame(game: typeof demoGame) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/games/riskuj-2026-06-06") {
+        return Response.json(game);
+      }
+
+      return new Response("not found", { status: 404 });
+    })
+  );
+}
+
 describe("PlayPage", () => {
   beforeEach(() => {
     playSfxMock.mockClear();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        if (String(input) === "/api/games/riskuj-2026-06-06") {
-          return Response.json(demoGame);
-        }
-
-        return new Response("not found", { status: 404 });
-      })
-    );
+    stubGame(demoGame);
   });
 
   afterEach(() => {
@@ -37,6 +51,8 @@ describe("PlayPage", () => {
     expect(header).not.toBeNull();
     expect(within(header as HTMLElement).queryByText("6.6.")).not.toBeInTheDocument();
     expect(within(header as HTMLElement).queryByRole("button", { name: "Zpět ze hry" })).not.toBeInTheDocument();
+    expect(within(header as HTMLElement).getByRole("button", { name: "Konec" })).toBeInTheDocument();
+    expect(within(header as HTMLElement).getByRole("button", { name: "Admin" })).toBeInTheDocument();
 
     const roundTabs = within(header as HTMLElement).getByRole("tablist", { name: "Kola soutěže" });
     expect(within(roundTabs).getByRole("tab", { name: "1" })).toHaveAttribute("aria-selected", "true");
@@ -102,7 +118,7 @@ describe("PlayPage", () => {
     expect(await within(dialog).findByText(/The B-52s/i)).toBeInTheDocument();
 
     const team1Button = within(dialog).getByRole("button", {
-      name: "tým 1"
+      name: "Tým 1"
     });
     expect(within(dialog).queryByText(/Přičíst Tým 1/i)).not.toBeInTheDocument();
     expect(within(dialog).queryAllByRole("button", { name: /1 000 Kč/i })).toHaveLength(0);
@@ -115,6 +131,114 @@ describe("PlayPage", () => {
       "data-state",
       "awarded"
     );
+  });
+
+  it("přehrává zapnuté zvukové efekty pro označení, otevření, odpověď a skórování", async () => {
+    stubGame({
+      ...demoGame,
+      soundEffects: {
+        enabled: true,
+        effects: presenterEffects
+      }
+    });
+
+    render(<PlayPage gameId="riskuj-2026-06-06" />);
+
+    await screen.findByRole("heading", { name: "Riskuj!" });
+    const tile = screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i });
+
+    fireEvent.click(tile);
+    expect(playSfxMock).toHaveBeenLastCalledWith(presenterEffects.questionSelected);
+
+    fireEvent.click(tile);
+    expect(playSfxMock).toHaveBeenLastCalledWith(presenterEffects.questionOpened);
+
+    const dialog = await screen.findByRole("dialog", { name: /Otázka za 1 000 Kč/i });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Zobrazit odpověď" }));
+    expect(playSfxMock).toHaveBeenLastCalledWith(presenterEffects.answerRevealed);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Tým 1" }));
+    expect(playSfxMock).toHaveBeenLastCalledWith(presenterEffects.correctAnswer);
+  });
+
+  it("přehrává zvuk pro špatnou odpověď a respektuje vypnuté efekty", async () => {
+    stubGame({
+      ...demoGame,
+      soundEffects: {
+        enabled: true,
+        effects: presenterEffects
+      }
+    });
+
+    render(<PlayPage gameId="riskuj-2026-06-06" />);
+
+    await screen.findByRole("heading", { name: "Riskuj!" });
+    const tile = screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i });
+    fireEvent.click(tile);
+    fireEvent.click(tile);
+    fireEvent.click(await screen.findByRole("button", { name: "Zobrazit odpověď" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog", { name: /Otázka za 1 000 Kč/i })).getByRole(
+        "button",
+        { name: "Nikdo neuhodl" }
+      )
+    );
+
+    expect(playSfxMock).toHaveBeenLastCalledWith(presenterEffects.wrongAnswer);
+
+    playSfxMock.mockClear();
+    stubGame({
+      ...demoGame,
+      soundEffects: {
+        enabled: false,
+        effects: presenterEffects
+      }
+    });
+
+    render(<PlayPage gameId="riskuj-2026-06-06" />);
+
+    await screen.findAllByRole("heading", { name: "Riskuj!" });
+    fireEvent.click(screen.getAllByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i })[1]);
+    expect(playSfxMock).not.toHaveBeenCalled();
+  });
+
+  it("finální dialog odkrývá pořadí od posledního po první a používá zvláštní efekt pro vítěze", async () => {
+    stubGame({
+      ...demoGame,
+      soundEffects: {
+        enabled: true,
+        effects: presenterEffects
+      }
+    });
+
+    render(<PlayPage gameId="riskuj-2026-06-06" />);
+
+    await screen.findByRole("heading", { name: "Riskuj!" });
+    const tile = screen.getByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i });
+    fireEvent.click(tile);
+    fireEvent.click(tile);
+    fireEvent.click(await screen.findByRole("button", { name: "Zobrazit odpověď" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog", { name: /Otázka za 1 000 Kč/i })).getByRole(
+        "button",
+        { name: "Tým 1" }
+      )
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Konec" }));
+    const finalDialog = await screen.findByRole("dialog", { name: "Konečné pořadí" });
+    expect(within(finalDialog).getByText("Postupně odkryjte umístění od posledního místa.")).toBeInTheDocument();
+
+    fireEvent.click(within(finalDialog).getByRole("button", { name: "Odkrýt další umístění" }));
+    expect(within(finalDialog).getByText("2. místo")).toBeInTheDocument();
+    expect(within(finalDialog).getAllByText("0 Kč")).toHaveLength(1);
+    expect(within(finalDialog).getByText("Tým 2")).toBeInTheDocument();
+    expect(playSfxMock).toHaveBeenLastCalledWith(presenterEffects.placementRevealed);
+
+    fireEvent.click(within(finalDialog).getByRole("button", { name: "Odkrýt další umístění" }));
+    expect(within(finalDialog).getByText("1. místo")).toBeInTheDocument();
+    expect(within(finalDialog).getByText("Tým 1")).toBeInTheDocument();
+    expect(playSfxMock).toHaveBeenLastCalledWith(presenterEffects.firstPlaceRevealed);
   });
 
 
@@ -139,7 +263,7 @@ describe("PlayPage", () => {
     const correctionDialog = await screen.findByRole("dialog", { name: /Otázka za 1 000 Kč/i });
     expect(within(correctionDialog).getByText(/The B-52s/i)).toBeInTheDocument();
     fireEvent.click(
-      within(correctionDialog).getByRole("button", { name: "tým 2" })
+      within(correctionDialog).getByRole("button", { name: "Tým 2" })
     );
 
     expect(within(scoreboard).getByText("1 000 Kč")).toBeInTheDocument();
@@ -158,7 +282,7 @@ describe("PlayPage", () => {
     fireEvent.click(
       within(await screen.findByRole("dialog", { name: /Otázka za 1 000 Kč/i })).getByRole(
         "button",
-        { name: "tým 1" }
+        { name: "Tým 1" }
       )
     );
 
@@ -166,7 +290,7 @@ describe("PlayPage", () => {
     fireEvent.click(
       within(await screen.findByRole("dialog", { name: /Otázka za 1 000 Kč/i })).getByRole(
         "button",
-        { name: "tým 2" }
+        { name: "Tým 2" }
       )
     );
 

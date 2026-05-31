@@ -9,7 +9,7 @@ Admin umí hru uložit do jednoho JSON souboru a stejný soubor znovu načíst. 
 3. Upravený soubor nahraj přes `Importovat JSON`.
 4. Import nahradí aktuálně otevřenou hru a rovnou ji uloží na server.
 
-MP3 soubory nejsou v JSON vložené. V JSON je jen cesta k souboru, typicky `/uploads/nazev.mp3`. Samotné MP3 nahraj v adminu přes pole `Nahrát MP3 k položce`.
+Audio soubory nejsou v JSON vložené. V JSON je jen cesta k souboru, typicky `/uploads/nazev.mp3` nebo `/uploads/nazev.wav`. Samotné MP3/WAV nahraj v adminu přes pole `Upload audio`.
 
 ## Podporovaný tvar
 

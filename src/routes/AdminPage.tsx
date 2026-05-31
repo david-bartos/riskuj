@@ -3,7 +3,32 @@ import { gamesClient, type GameSummary } from "../api/gamesClient";
 import GameEditor, { createEmptyGame } from "../components/admin/GameEditor";
 import type { AudioAsset, Game } from "../types/game";
 
-export function AdminPage() {
+type AdminPageProps = {
+  runningGameId?: string;
+  onNavigate?: (path: string) => void;
+  onResumeGame?: () => void;
+};
+
+function createSummary(game: Game): GameSummary {
+  return {
+    id: game.id,
+    title: game.title,
+    updatedAt: game.updatedAt ?? game.createdAt ?? "",
+    roundCount: game.rounds.length
+  };
+}
+
+function upsertSummary(summaries: GameSummary[], summary: GameSummary) {
+  const existingIndex = summaries.findIndex((current) => current.id === summary.id);
+
+  if (existingIndex === -1) {
+    return [summary, ...summaries];
+  }
+
+  return summaries.map((current) => (current.id === summary.id ? summary : current));
+}
+
+export function AdminPage({ runningGameId = "", onNavigate, onResumeGame }: AdminPageProps) {
   const [games, setGames] = useState<GameSummary[]>([]);
   const [selectedGameId, setSelectedGameId] = useState("");
   const [game, setGame] = useState<Game | null>(null);
@@ -107,6 +132,30 @@ export function AdminPage() {
     return asset;
   }
 
+  function handleStartTest() {
+    if (!selectedGameId) {
+      return;
+    }
+
+    if (runningGameId && runningGameId !== selectedGameId) {
+      const shouldStart = window.confirm(
+        "Už je rozehraná jiná hra. Spuštěním nové hry se aktuální průběh nahradí. Pokračovat?"
+      );
+
+      if (!shouldStart) {
+        return;
+      }
+    }
+
+    const playPath = `/play/${encodeURIComponent(selectedGameId)}`;
+    if (onNavigate) {
+      onNavigate(playPath);
+      return;
+    }
+
+    window.history.pushState({}, "", playPath);
+  }
+
   async function handleSave(nextGame: Game) {
     setIsSaving(true);
     setError(null);
@@ -114,21 +163,15 @@ export function AdminPage() {
 
     try {
       const savedGame = await gamesClient.saveGame(nextGame);
+      const savedSummary = createSummary(savedGame);
       setGame(savedGame);
       setSelectedGameId(savedGame.id);
-      setGames((currentGames) => {
-        const summary = {
-          id: savedGame.id,
-          title: savedGame.title,
-          updatedAt: savedGame.updatedAt ?? savedGame.createdAt ?? "",
-          roundCount: savedGame.rounds.length
-        };
-        const existingIndex = currentGames.findIndex((current) => current.id === savedGame.id);
-        if (existingIndex === -1) {
-          return [...currentGames, summary];
-        }
-        return currentGames.map((current) => (current.id === savedGame.id ? summary : current));
-      });
+      try {
+        const refreshedGames = await gamesClient.listGames();
+        setGames(upsertSummary(refreshedGames, savedSummary));
+      } catch {
+        setGames((currentGames) => upsertSummary(currentGames, savedSummary));
+      }
       setStatus("Hra byla uložená.");
     } catch (saveError) {
       const detail = saveError instanceof Error ? saveError.message : "neznámá chyba";
@@ -166,6 +209,25 @@ export function AdminPage() {
         </label>
         <button type="button" onClick={handleCreateNewGame}>
           Nová hra
+        </button>
+        {runningGameId ? (
+          <button
+            type="button"
+            onClick={() => {
+              if (onResumeGame) {
+                onResumeGame();
+                return;
+              }
+
+              const playPath = `/play/${encodeURIComponent(runningGameId)}`;
+              window.history.pushState({}, "", playPath);
+            }}
+          >
+            Vrátit se do hry
+          </button>
+        ) : null}
+        <button type="button" disabled={!selectedGameId} onClick={handleStartTest}>
+          Spustit hru
         </button>
       </section>
 

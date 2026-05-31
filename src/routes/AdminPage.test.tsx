@@ -134,17 +134,17 @@ describe("AdminPage", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
-  it("nahraje MP3, připojí ho k položce a uloží hru s neutrálním AudioAsset", async () => {
+  it("nahraje audio, připojí ho k položce a uloží hru s neutrálním AudioAsset", async () => {
     render(<AdminPage />);
 
-    expect(
-      await screen.findByRole("heading", { name: "Editor hry" })
-    ).toBeInTheDocument();
+    expect(await screen.findByLabelText("Editor hry")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "1. kolo" }));
 
-    const fileInput = (await screen.findAllByLabelText("Nahrát MP3 k položce"))[0];
+    const fileInput = (await screen.findAllByLabelText("Upload audio"))[0];
     fireEvent.change(fileInput, {
       target: {
         files: [new File(["fake"], "uploaded.mp3", { type: "audio/mpeg" })]
@@ -179,5 +179,123 @@ describe("AdminPage", () => {
     const savedGame = JSON.parse(String(saveCall?.[1]?.body));
     expect(JSON.stringify(savedGame)).toContain("/uploads/uploaded.mp3");
     expect(JSON.stringify(savedGame)).toContain("originalName");
+  });
+
+  it("po uložení znovu načte seznam her a ukáže uložený název v selectu", async () => {
+    let saved = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+
+        if (url === "/api/games" && !init) {
+          return Response.json([
+            {
+              id: adminGame.id,
+              title: saved ? "Přejmenovaná hra" : adminGame.title,
+              updatedAt: adminGame.updatedAt,
+              roundCount: adminGame.rounds.length
+            }
+          ]);
+        }
+
+        if (url === "/api/games/admin-test" && !init) {
+          return Response.json(adminGame);
+        }
+
+        if (url === "/api/audio-assets" && !init) {
+          return Response.json([]);
+        }
+
+        if (url === "/api/games/admin-test" && init?.method === "PUT") {
+          saved = true;
+          return Response.json({
+            ...JSON.parse(String(init.body)),
+            title: "Přejmenovaná hra"
+          });
+        }
+
+        return new Response("not found", { status: 404 });
+      })
+    );
+
+    render(<AdminPage />);
+
+    await screen.findByLabelText("Editor hry");
+    expect(screen.getByLabelText("Počet týmů")).toHaveValue(1);
+    fireEvent.change(screen.getByLabelText("Počet týmů"), {
+      target: { value: "3" }
+    });
+    fireEvent.change(await screen.findByDisplayValue("Tým 2"), {
+      target: { value: "Bar" }
+    });
+    fireEvent.change(screen.getByLabelText("Název hry"), {
+      target: { value: "Přejmenovaná hra" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Uložit hru" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "Přejmenovaná hra" })).toBeInTheDocument();
+    });
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => url === "/api/games")).toHaveLength(2);
+    const saveCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([url, init]) => url === "/api/games/admin-test" && init?.method === "PUT");
+    const savedGame = JSON.parse(String(saveCall?.[1]?.body));
+    expect(savedGame.teams).toHaveLength(3);
+    expect(savedGame.teams[1].name).toBe("Bar");
+  });
+
+  it("spustí test vybrané uložené hry", async () => {
+    const onNavigate = vi.fn();
+
+    render(<AdminPage onNavigate={onNavigate} />);
+
+    await screen.findByLabelText("Editor hry");
+    fireEvent.click(screen.getByRole("button", { name: "Spustit hru" }));
+
+    expect(onNavigate).toHaveBeenCalledWith("/play/admin-test");
+  });
+
+  it("nabídne návrat do rozehrané hry", async () => {
+    const onResumeGame = vi.fn();
+
+    render(<AdminPage runningGameId="admin-test" onResumeGame={onResumeGame} />);
+
+    await screen.findByLabelText("Editor hry");
+    fireEvent.click(screen.getByRole("button", { name: "Vrátit se do hry" }));
+
+    expect(onResumeGame).toHaveBeenCalledTimes(1);
+  });
+
+  it("před spuštěním jiné hry varuje před nahrazením rozehraného průběhu", async () => {
+    const onNavigate = vi.fn();
+    const confirmSpy = vi
+      .spyOn(window, "confirm")
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true);
+
+    render(<AdminPage runningGameId="other-game" onNavigate={onNavigate} />);
+
+    await screen.findByLabelText("Editor hry");
+    fireEvent.click(screen.getByRole("button", { name: "Spustit hru" }));
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      "Už je rozehraná jiná hra. Spuštěním nové hry se aktuální průběh nahradí. Pokračovat?"
+    );
+    expect(onNavigate).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Spustit hru" }));
+
+    expect(onNavigate).toHaveBeenCalledWith("/play/admin-test");
+  });
+
+  it("u nové neuložené hry nechá spuštění testu vypnuté", async () => {
+    render(<AdminPage />);
+
+    await screen.findByLabelText("Editor hry");
+    fireEvent.click(screen.getByRole("button", { name: "Nová hra" }));
+
+    expect(screen.getByRole("button", { name: "Spustit hru" })).toBeDisabled();
   });
 });

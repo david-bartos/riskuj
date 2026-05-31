@@ -4,10 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "setup:windows": "powershell -ExecutionPolicy Bypass -File scripts/setup.ps1",
+    "setup:unix": "bash scripts/setup.sh",
     "dev": "concurrently \"npm:dev:client\" \"npm:dev:server\"",
     "dev:client": "vite",
     "dev:server": "tsx watch server/index.ts",
     "build": "tsc --noEmit && vite build",
+    "start": "tsx server/index.ts",
     "preview": "vite preview",
     "test": "vitest run"
   },
