@@ -133,6 +133,31 @@ docker run --rm -p 3000:3000 \
   riskuj
 ```
 
+### GitHub Actions image builds
+
+GitHub Actions builds a Docker image for every pull request and every push to
+`main`.
+
+- Pull requests upload a `riskuj-image-<sha>` workflow artifact containing a
+  gzipped Docker image tarball.
+- Pushes to `main` also publish `ghcr.io/david-bartos/riskuj:latest` and
+  `ghcr.io/david-bartos/riskuj:<sha>`.
+
+To use a workflow artifact locally:
+
+```bash
+gh run download <run-id> --name riskuj-image-<sha>
+gunzip -c riskuj-image-<sha>.tar.gz | docker load
+docker run --rm -p 3000:3000 riskuj:<sha>
+```
+
+To pull the published image after a `main` build:
+
+```bash
+docker pull ghcr.io/david-bartos/riskuj:latest
+docker run --rm -p 3000:3000 ghcr.io/david-bartos/riskuj:latest
+```
+
 ## Agent quick reference
 
 - Výchozí stránka aplikace je admin: `http://localhost:5173/`.
