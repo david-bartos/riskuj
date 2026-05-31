@@ -39,32 +39,35 @@ describe("AudioUploadField", () => {
     );
   });
 
-  it("odmítne jiný než MP3 soubor bez volání uploadu", () => {
+  it("odmítne nepodporovaný audio soubor bez volání uploadu", () => {
     const { onUploadAudio } = renderField();
-    const input = screen.getByLabelText("Nahrát MP3 k položce");
+    const input = screen.getByLabelText("Upload audio");
 
     fireEvent.change(input, {
       target: { files: [new File(["text"], "notes.txt", { type: "text/plain" })] }
     });
 
     expect(onUploadAudio).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toHaveTextContent("Nahrajte prosím soubor MP3.");
+    expect(screen.getByRole("alert")).toHaveTextContent("Nahrajte prosím soubor MP3 nebo WAV.");
   });
 
-  it("nahraje MP3, zobrazí průběh a předá vrácený AudioAsset", async () => {
+  it("nahraje MP3 nebo WAV, zobrazí průběh a předá vrácený AudioAsset", async () => {
     const pendingUpload = new Promise<AudioAsset>((resolve) => {
       setTimeout(() => resolve(asset), 0);
     });
     const onUploadAudio = vi.fn().mockReturnValue(pendingUpload);
     const onChange = vi.fn();
     renderField({ onUploadAudio, onChange });
-    const file = new File(["ID3"], "intro.mp3", { type: "audio/mpeg" });
+    const file = new File(["RIFF"], "intro.wav", { type: "audio/wav" });
+    const input = screen.getByLabelText("Upload audio");
 
-    fireEvent.change(screen.getByLabelText("Nahrát MP3 k položce"), {
+    expect(input).toHaveAttribute("accept", ".mp3,.wav");
+
+    fireEvent.change(input, {
       target: { files: [file] }
     });
 
-    expect(screen.getByRole("status")).toHaveTextContent("Nahrávám MP3...");
+    expect(screen.getByRole("status")).toHaveTextContent("Nahrávám audio...");
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(asset));
     expect(onUploadAudio).toHaveBeenCalledWith(file);
     expect(screen.getByRole("status")).toHaveTextContent("Audio je připojené.");
@@ -79,7 +82,7 @@ describe("AudioUploadField", () => {
     const onChange = vi.fn();
     renderField({ audio: asset, onUploadAudio, onChange });
 
-    fireEvent.change(screen.getByLabelText("Nahrát MP3 k položce"), {
+    fireEvent.change(screen.getByLabelText("Upload audio"), {
       target: { files: [new File(["ID3"], "older.mp3", { type: "audio/mpeg" })] }
     });
     fireEvent.click(screen.getByRole("button", { name: "Odebrat audio" }));
@@ -109,10 +112,10 @@ describe("AudioUploadField", () => {
     const onChange = vi.fn();
     renderField({ audioAssets: [libraryAsset], onUploadAudio, onChange });
 
-    fireEvent.change(screen.getByLabelText("Nahrát MP3 k položce"), {
+    fireEvent.change(screen.getByLabelText("Upload audio"), {
       target: { files: [new File(["ID3"], "older.mp3", { type: "audio/mpeg" })] }
     });
-    fireEvent.change(screen.getByLabelText("Vybrat MP3 z knihovny"), {
+    fireEvent.change(screen.getByLabelText("Vybrat audio z knihovny"), {
       target: { value: "audio-library" }
     });
 
@@ -131,7 +134,7 @@ describe("AudioUploadField", () => {
     const onUploadAudio = vi.fn().mockRejectedValue(new Error("Server spadl."));
     renderField({ onUploadAudio });
 
-    fireEvent.change(screen.getByLabelText("Nahrát MP3 k položce"), {
+    fireEvent.change(screen.getByLabelText("Upload audio"), {
       target: { files: [new File(["ID3"], "intro.mp3", { type: "audio/mpeg" })] }
     });
 

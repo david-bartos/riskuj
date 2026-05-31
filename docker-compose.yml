@@ -1,0 +1,12 @@
+services:
+  riskuj:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      # Optional:
+      # BASIC_AUTH_USER: "admin"
+      # BASIC_AUTH_PASSWORD: "secret"
+    volumes:
+      - ./data:/app/data

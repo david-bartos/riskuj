@@ -223,6 +223,33 @@ describe("server", () => {
     await expect(fs.readFile(savedPath)).resolves.toEqual(mp3Bytes);
   });
 
+  it("uloží WAV upload pod neprůhledným UUID src a vrátí AudioAsset", async () => {
+    const app = createTestServer();
+    const wavBytes = Buffer.from("RIFF test wav payload");
+
+    const response = await request(app)
+      .post("/api/uploads/audio")
+      .attach("file", wavBytes, {
+        contentType: "audio/wav",
+        filename: "effect.wav"
+      })
+      .expect(200);
+
+    expect(response.body).toEqual({
+      id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      src: expect.stringMatching(/^\/uploads\/[0-9a-f-]{36}\.wav$/),
+      title: "effect",
+      originalName: "effect.wav",
+      displayName: "effect",
+      mimeType: "audio/wav"
+    });
+
+    const savedFilename = basename(response.body.src);
+    const savedPath = join(uploadsDir, savedFilename);
+    expect(existsSync(savedPath)).toBe(true);
+    await expect(fs.readFile(savedPath)).resolves.toEqual(wavBytes);
+  });
+
   it("persistuje audio knihovnu a podporuje kompatibilní /api/audio-assets endpoint", async () => {
     const app = createTestServer();
 
@@ -267,12 +294,12 @@ describe("server", () => {
       .expect(400);
 
     expect(response.body).toEqual({
-      error: 'MP3 file is required in multipart field "file".'
+      error: 'Audio file is required in multipart field "file".'
     });
     expect(response.headers["content-type"]).toContain("application/json");
   });
 
-  it("vrátí 400 JSON error pro jiný než MP3 upload", async () => {
+  it("vrátí 400 JSON error pro jiný než MP3/WAV upload", async () => {
     const app = createTestServer();
 
     const response = await request(app)
@@ -284,7 +311,7 @@ describe("server", () => {
       .expect(400);
 
     expect(response.body).toEqual({
-      error: "Only MP3 audio uploads are supported."
+      error: "Only MP3 or WAV audio uploads are supported."
     });
     await expect(fs.readdir(uploadsDir)).resolves.toEqual([]);
   });
@@ -301,7 +328,7 @@ describe("server", () => {
       .expect(400);
 
     expect(response.body).toEqual({
-      error: 'MP3 file is required in multipart field "file".'
+      error: 'Audio file is required in multipart field "file".'
     });
     await expect(fs.readdir(uploadsDir)).resolves.toEqual([]);
   });

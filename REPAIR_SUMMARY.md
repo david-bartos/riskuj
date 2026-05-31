@@ -15,8 +15,8 @@ Files changed:
 - `src/components/admin/QuestionEditor.tsx`
 
 Key outcomes:
-- MP3 uploads persist as audio assets and static files using opaque `/uploads/<uuid>.mp3` URLs.
-- Admin editor can upload, choose, attach, and preview MP3s for question, listening, and common-denominator items.
+- MP3/WAV uploads persist as audio assets and static files using opaque `/uploads/<uuid>.<ext>` URLs.
+- Admin editor can upload, choose, attach, and preview audio files for question, listening, and common-denominator items.
 - Saved editor data is projected back into canonical `rounds` for server validation and presenter loading.
 - `/play/:gameId` loads game data via the game API client and handles question, listening, and common-denominator rounds.
 - Presenter Enter flow, manual scoring, completed tile disabling, and pre-reveal leak safety are covered by regression tests.

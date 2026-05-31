@@ -1,30 +1,28 @@
 import { useEffect, useState } from "react";
-import { Layout } from "./components/Layout";
+import InteractiveTooltips from "./components/InteractiveTooltips";
 import { AdminPage } from "./routes/AdminPage";
-import { HomePage } from "./routes/HomePage";
 import { PlayPage } from "./routes/PlayPage";
 
 type Route =
-  | { name: "home" }
   | { name: "admin" }
   | { name: "play"; gameId: string };
 
 function parseRoute(pathname: string): Route {
-  if (pathname === "/admin") {
-    return { name: "admin" };
-  }
-
   const playMatch = pathname.match(/^\/play\/([^/]+)$/);
   if (playMatch) {
     return { name: "play", gameId: decodeURIComponent(playMatch[1]) };
   }
 
-  return { name: "home" };
+  return { name: "admin" };
 }
 
 export default function App() {
   const [path, setPath] = useState(() => window.location.pathname);
   const route = parseRoute(path);
+  const [runningGameId, setRunningGameId] = useState(() => {
+    const initialRoute = parseRoute(window.location.pathname);
+    return initialRoute.name === "play" ? initialRoute.gameId : "";
+  });
 
   useEffect(() => {
     const handlePopState = () => setPath(window.location.pathname);
@@ -33,25 +31,43 @@ export default function App() {
   }, []);
 
   const navigate = (nextPath: string) => {
+    const nextRoute = parseRoute(nextPath);
+    if (nextRoute.name === "play") {
+      setRunningGameId(nextRoute.gameId);
+    }
+
     if (window.location.pathname !== nextPath) {
       window.history.pushState({}, "", nextPath);
     }
     setPath(nextPath);
   };
 
-  let page = <HomePage onNavigate={navigate} />;
-
-  if (route.name === "admin") {
-    page = <AdminPage />;
-  }
-
-  if (route.name === "play") {
-    page = <PlayPage gameId={route.gameId} onExit={() => navigate("/")} />;
-  }
+  const playGameId = route.name === "play" ? route.gameId : runningGameId;
 
   return (
-    <Layout currentPath={path} onNavigate={navigate} showPlayShortcut={route.name !== "play"}>
-      {page}
-    </Layout>
+    <>
+      <InteractiveTooltips />
+      {route.name === "admin" ? (
+        <AdminPage
+          runningGameId={runningGameId}
+          onNavigate={navigate}
+          onResumeGame={() => {
+            if (runningGameId) {
+              navigate(`/play/${encodeURIComponent(runningGameId)}`);
+            }
+          }}
+        />
+      ) : null}
+      {playGameId ? (
+        <div hidden={route.name !== "play"}>
+          <PlayPage
+            key={playGameId}
+            gameId={playGameId}
+            isActive={route.name === "play"}
+            onExit={() => navigate("/")}
+          />
+        </div>
+      ) : null}
+    </>
   );
 }

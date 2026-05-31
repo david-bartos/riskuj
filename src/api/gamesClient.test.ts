@@ -126,7 +126,7 @@ describe("gamesClient", () => {
     });
   });
 
-  it("nahraje MP3 soubor do upload endpointu", async () => {
+  it("nahraje audio soubor do upload endpointu", async () => {
     const file = new File(["ID3"], "intro.mp3", { type: "audio/mpeg" });
     const asset = { id: "audio-1", src: "/uploads/audio-1.mp3", title: "intro" };
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(asset));
@@ -141,18 +141,18 @@ describe("gamesClient", () => {
     expect(body.get("file")).toBe(file);
   });
 
-  it("mapuje backend chybu pro jiný než MP3 soubor do češtiny", async () => {
+  it("mapuje backend chybu pro jiný než MP3/WAV soubor do češtiny", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
-        jsonResponse({ error: "Only MP3 audio uploads are supported." }, { status: 400 })
+        jsonResponse({ error: "Only MP3 or WAV audio uploads are supported." }, { status: 400 })
       )
     );
 
     await expect(
       uploadAudio(new File(["x"], "notes.txt", { type: "text/plain" }))
     ).rejects.toMatchObject({
-      message: "Nahrajte prosím soubor MP3.",
+      message: "Nahrajte prosím soubor MP3 nebo WAV.",
       status: 400
     });
   });
@@ -162,7 +162,7 @@ describe("gamesClient", () => {
       "fetch",
       vi.fn().mockResolvedValue(
         jsonResponse(
-          { error: 'MP3 file is required in multipart field "file".' },
+          { error: 'Audio file is required in multipart field "file".' },
           { status: 400 }
         )
       )
@@ -171,7 +171,7 @@ describe("gamesClient", () => {
     await expect(
       uploadAudio(new File([""], "empty.mp3", { type: "audio/mpeg" }))
     ).rejects.toMatchObject({
-      message: "Vyberte prosím MP3 soubor k nahrání.",
+      message: "Vyberte prosím audio soubor k nahrání.",
       status: 400
     });
   });

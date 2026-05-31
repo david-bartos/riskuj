@@ -19,13 +19,14 @@ type CreateServerOptions = {
 
 interface AudioUploadRequest extends express.Request {
   generatedAudioId?: string;
+  generatedAudioExtension?: ".mp3" | ".wav";
 }
 
 const defaultUploadsDir = resolve(process.cwd(), "data", "uploads");
 const defaultAudioAssetsPath = resolve(process.cwd(), "data", "audio-assets.json");
 const defaultStaticDir = resolve(process.cwd(), "dist");
-const mp3UploadRequiredMessage = 'MP3 file is required in multipart field "file".';
-const invalidMp3Message = "Only MP3 audio uploads are supported.";
+const audioUploadRequiredMessage = 'Audio file is required in multipart field "file".';
+const invalidAudioMessage = "Only MP3 or WAV audio uploads are supported.";
 
 const asyncHandler =
   (handler: express.RequestHandler): express.RequestHandler =>
@@ -37,12 +38,34 @@ function createAudioId() {
   return randomUUID();
 }
 
-function isAcceptedMp3(file: Express.Multer.File) {
-  return (
+function audioExtension(file: Express.Multer.File): ".mp3" | ".wav" | undefined {
+  const originalName = file.originalname.toLowerCase();
+  if (
     file.mimetype === "audio/mpeg" ||
     file.mimetype === "audio/mp3" ||
-    file.originalname.toLowerCase().endsWith(".mp3")
-  );
+    originalName.endsWith(".mp3")
+  ) {
+    return ".mp3";
+  }
+
+  if (
+    file.mimetype === "audio/wav" ||
+    file.mimetype === "audio/wave" ||
+    file.mimetype === "audio/x-wav" ||
+    originalName.endsWith(".wav")
+  ) {
+    return ".wav";
+  }
+
+  return undefined;
+}
+
+function audioMimeType(extension: ".mp3" | ".wav") {
+  return extension === ".wav" ? "audio/wav" : "audio/mpeg";
+}
+
+function isAcceptedAudio(file: Express.Multer.File) {
+  return audioExtension(file) !== undefined;
 }
 
 function titleFromUpload(file: Express.Multer.File, formTitle: unknown) {
@@ -55,7 +78,7 @@ function titleFromUpload(file: Express.Multer.File, formTitle: unknown) {
   const filename = basename(file.originalname);
   const extension = extname(filename);
 
-  return extension.toLowerCase() === ".mp3"
+  return extension.toLowerCase() === ".mp3" || extension.toLowerCase() === ".wav"
     ? filename.slice(0, -extension.length)
     : filename;
 }
@@ -93,12 +116,12 @@ export function createServer(options: CreateServerOptions = {}) {
 
   const upload = multer({
     fileFilter: (_request, file, callback) => {
-      if (isAcceptedMp3(file)) {
+      if (isAcceptedAudio(file)) {
         callback(null, true);
         return;
       }
 
-      callback(new Error(invalidMp3Message));
+      callback(new Error(invalidAudioMessage));
     },
     storage: multer.diskStorage({
       destination: (_request, _file, callback) => {
@@ -106,8 +129,9 @@ export function createServer(options: CreateServerOptions = {}) {
       },
       filename: (request: AudioUploadRequest, _file, callback) => {
         const audioId = createAudioId();
+        request.generatedAudioExtension = audioExtension(_file);
         request.generatedAudioId = audioId;
-        callback(null, `${audioId}.mp3`);
+        callback(null, `${audioId}${request.generatedAudioExtension ?? ".mp3"}`);
       }
     })
   });
@@ -118,26 +142,26 @@ export function createServer(options: CreateServerOptions = {}) {
         if (error) {
           response.status(400).json({
             error:
-              error instanceof Error && error.message === invalidMp3Message
-                ? invalidMp3Message
-                : mp3UploadRequiredMessage
+              error instanceof Error && error.message === invalidAudioMessage
+                ? invalidAudioMessage
+                : audioUploadRequiredMessage
           });
           return;
         }
 
-        if (!request.file || !request.generatedAudioId) {
-          response.status(400).json({ error: mp3UploadRequiredMessage });
+        if (!request.file || !request.generatedAudioId || !request.generatedAudioExtension) {
+          response.status(400).json({ error: audioUploadRequiredMessage });
           return;
         }
 
         const title = titleFromUpload(request.file, request.body.title ?? request.body.displayName);
         const asset: AudioAsset = {
           id: request.generatedAudioId,
-          src: `/uploads/${request.generatedAudioId}.mp3`,
+          src: `/uploads/${request.generatedAudioId}${request.generatedAudioExtension}`,
           title,
           originalName: request.file.originalname,
           displayName: title,
-          mimeType: "audio/mpeg"
+          mimeType: audioMimeType(request.generatedAudioExtension)
         };
 
         void appendAudioAsset(asset)

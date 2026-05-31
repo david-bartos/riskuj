@@ -1,3 +1,5 @@
+import type { AudioAsset } from "../types/game";
+
 export type SfxName = "open" | "correct" | "wrong" | "timeout";
 
 const sfxFiles: Record<SfxName, string> = {
@@ -7,13 +9,30 @@ const sfxFiles: Record<SfxName, string> = {
   timeout: "/sfx/timeout.mp3"
 };
 
-export function playSfx(name: SfxName): void {
+function resolveSfxSource(source: AudioAsset | SfxName | string | undefined): string {
+  if (!source) {
+    return "";
+  }
+
+  if (typeof source === "object") {
+    return source.src;
+  }
+
+  return sfxFiles[source as SfxName] ?? source;
+}
+
+export function playSfx(source: AudioAsset | SfxName | string | undefined): void {
   try {
     if (typeof Audio === "undefined") {
       return;
     }
 
-    const audio = new Audio(sfxFiles[name]);
+    const src = resolveSfxSource(source);
+    if (!src) {
+      return;
+    }
+
+    const audio = new Audio(src);
     const playResult = audio.play();
 
     if (playResult && typeof playResult.catch === "function") {

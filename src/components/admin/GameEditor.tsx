@@ -4,6 +4,8 @@ import type {
   Category,
   CommonDenominatorItem,
   Game,
+  GameSoundEffectKey,
+  GameSoundEffects,
   ListeningGenre,
   ListeningItem,
   Question,
@@ -22,6 +24,7 @@ import {
   serializeGameToJson
 } from "../../importExport/gameJson";
 import TeamSetup from "../game/TeamSetup";
+import AudioUploadField from "./AudioUploadField";
 
 const questionPoints: QuestionPoints[] = [100, 200, 300, 400, 500];
 const roundTypeOrder: RoundType[] = ["question", "listening", "common-denominator"];
@@ -44,12 +47,39 @@ type EditableGame = Game & {
   listeningItems: ListeningItem[];
   commonDenominator: NonNullable<Game["commonDenominator"]>;
   commonDenominatorItems: CommonDenominatorItem[];
+  soundEffects: GameSoundEffects;
 };
 
 type AudioEditorProps = {
   audioAssets: AudioAsset[];
   onUploadAudio?: (file: File) => Promise<AudioAsset>;
 };
+
+type EditorTab = "settings" | "question" | "listening" | "common-denominator";
+
+const editorTabs: Array<{ id: EditorTab; label: string }> = [
+  { id: "settings", label: "Nastavení" },
+  { id: "question", label: "1. kolo" },
+  { id: "listening", label: "2. kolo" },
+  { id: "common-denominator", label: "3. kolo" }
+];
+
+const soundEffectLabels: Array<{ key: GameSoundEffectKey; label: string }> = [
+  { key: "questionSelected", label: "Označení otázky" },
+  { key: "questionOpened", label: "Otevření otázkového dialogu" },
+  { key: "answerRevealed", label: "Zobrazení odpovědi" },
+  { key: "correctAnswer", label: "Správná odpověď" },
+  { key: "wrongAnswer", label: "Špatná odpověď" },
+  { key: "placementRevealed", label: "Odhalení umístění" },
+  { key: "firstPlaceRevealed", label: "Odhalení 1. místa" }
+];
+
+function normalizeSoundEffects(soundEffects?: GameSoundEffects): GameSoundEffects {
+  return {
+    enabled: soundEffects?.enabled ?? false,
+    effects: { ...(soundEffects?.effects ?? {}) }
+  };
+}
 
 export function normalizeGame(game: Game): EditableGame {
   const questionRound = game.rounds.find((round) => round.type === "question");
@@ -95,7 +125,8 @@ export function normalizeGame(game: Game): EditableGame {
     listeningGenres,
     listeningItems,
     commonDenominator: game.commonDenominator ?? { answer: "", clues: [] },
-    commonDenominatorItems
+    commonDenominatorItems,
+    soundEffects: normalizeSoundEffects(game.soundEffects)
   };
 }
 
@@ -125,7 +156,8 @@ export function createEmptyGame(): Game {
     commonDenominator: {
       answer: "",
       clues: []
-    }
+    },
+    soundEffects: normalizeSoundEffects()
   };
 }
 
@@ -283,10 +315,12 @@ export default function GameEditor({
 }: GameEditorProps) {
   const [game, setGame] = useState(() => normalizeGame(initialGame));
   const [errors, setErrors] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<EditorTab>("settings");
 
   useEffect(() => {
     setGame(normalizeGame(initialGame));
     setErrors([]);
+    setActiveTab("settings");
   }, [initialGame]);
 
   const questionsByCategory = useMemo(() => {
@@ -297,6 +331,39 @@ export default function GameEditor({
         .sort((left, right) => left.points - right.points)
     }));
   }, [game.categories, game.questions]);
+  const hasAvailableRoundType = roundTypeOrder.some(
+    (type) => !game.rounds.some((round) => round.type === type)
+  );
+
+  function setSoundEffectsEnabled(enabled: boolean) {
+    setGame((current) => ({
+      ...current,
+      soundEffects: {
+        ...current.soundEffects,
+        enabled
+      }
+    }));
+  }
+
+  function updateSoundEffect(key: GameSoundEffectKey, audio: AudioAsset | undefined) {
+    setGame((current) => {
+      const effects = { ...current.soundEffects.effects };
+
+      if (audio) {
+        effects[key] = audio;
+      } else {
+        delete effects[key];
+      }
+
+      return {
+        ...current,
+        soundEffects: {
+          ...current.soundEffects,
+          effects
+        }
+      };
+    });
+  }
 
   function updateQuestion(nextQuestion: Question) {
     setGame((current) => ({
@@ -496,80 +563,22 @@ export default function GameEditor({
 
   return (
     <form className="editor-form" aria-label="Editor hry" onSubmit={handleSubmit}>
-      <section className="editor-section">
-        <div className="section-heading-row">
-          <h2>Kola hry</h2>
-          <button className="button-compact" type="button" onClick={addRound}>
-            Přidat kolo
+      <nav className="editor-tabs" role="tablist" aria-label="Části editoru">
+        {editorTabs.map((tab) => (
+          <button
+            aria-controls={`editor-panel-${tab.id}`}
+            aria-selected={activeTab === tab.id}
+            className="editor-tab-button"
+            id={`editor-tab-${tab.id}`}
+            key={tab.id}
+            role="tab"
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
           </button>
-        </div>
-        {game.rounds.map((round, index) => (
-          <div className="inline-actions" key={round.id}>
-            <label className="field-stack">
-              <span>Typ kola</span>
-              <select
-                value={round.type}
-                onChange={(event) => changeRoundType(round.id, event.target.value as RoundType)}
-              >
-                {roundTypeOrder.map((type) => (
-                  <option
-                    disabled={game.rounds.some(
-                      (candidate) => candidate.id !== round.id && candidate.type === type
-                    )}
-                    key={type}
-                    value={type}
-                  >
-                    {roundTypeLabel(type)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              aria-label={`Odebrat kolo ${index + 1}`}
-              className="button-compact"
-              type="button"
-              onClick={() => removeRound(round.id)}
-            >
-              Odebrat
-            </button>
-          </div>
         ))}
-      </section>
-
-      <section className="editor-section">
-        <div className="section-heading-row">
-          <h2>Import a export</h2>
-          <div className="inline-actions">
-            <button type="button" onClick={handleExportJson}>
-              Exportovat JSON
-            </button>
-            <label className="button-like">
-              <span>Importovat JSON</span>
-              <input
-                aria-label="Importovat JSON hry"
-                accept="application/json,.json"
-                type="file"
-                onChange={(event) => void handleImportJson(event)}
-              />
-            </label>
-          </div>
-        </div>
-      </section>
-
-      <label className="field-stack">
-        <span>Název hry</span>
-        <input
-          value={game.title}
-          onChange={(event) =>
-            setGame((current) => ({ ...current, title: event.target.value }))
-          }
-        />
-      </label>
-
-      <TeamSetup
-        teams={game.teams}
-        onChange={(teams) => setGame((current) => ({ ...current, teams }))}
-      />
+      </nav>
 
       {errors.length > 0 ? (
         <div className="form-message form-message-error" role="alert">
@@ -581,231 +590,381 @@ export default function GameEditor({
         </div>
       ) : null}
 
-      <section className="editor-section">
-        <h2>První kolo</h2>
-        <CategoryEditor
-          title="Kategorie prvního kola"
-          addLabel="Přidat kategorii"
-          emptyLabel="Zatím nejsou přidané žádné kategorie."
-          deleteMessage="Smazáním kategorie se smažou i její otázky. Pokračovat?"
-          groups={game.categories}
-          onAdd={addCategory}
-          onRename={(categoryId, title) =>
-            setGame((current) => ({
-              ...current,
-              categories: current.categories.map((category) =>
-                category.id === categoryId ? { ...category, title } : category
-              )
-            }))
-          }
-          onRemove={(categoryId) =>
-            setGame((current) => ({
-              ...current,
-              categories: current.categories.filter((category) => category.id !== categoryId),
-              questions: current.questions.filter((question) => question.categoryId !== categoryId)
-            }))
-          }
-        />
-        {questionsByCategory.map(({ category, questions }) => (
-          <section className="editor-section nested-section" key={category.id}>
-            <h3>{category.title || "Kategorie bez názvu"}</h3>
-            <div className="item-list">
-              {questions.map((question) => (
-                <FirstRoundQuestionEditor
-                  key={question.id}
-                  question={question}
-                  categoryTitle={category.title || "bez názvu"}
+      {activeTab === "settings" ? (
+        <section
+          aria-labelledby="editor-tab-settings"
+          className="editor-tab-panel"
+          id="editor-panel-settings"
+          role="tabpanel"
+        >
+          <section className="editor-section">
+            <div className="section-heading-row">
+              <h2>Kola hry</h2>
+              <button
+                className="button-compact"
+                type="button"
+                disabled={!hasAvailableRoundType}
+                onClick={addRound}
+              >
+                Přidat kolo
+              </button>
+            </div>
+            {!hasAvailableRoundType ? (
+              <p className="muted-text">
+                Všechna podporovaná kola jsou přidaná.
+              </p>
+            ) : null}
+            {game.rounds.map((round, index) => (
+              <div className="inline-actions round-type-row" key={round.id}>
+                <label className="field-stack">
+                  <span>Typ kola</span>
+                  <select
+                    value={round.type}
+                    onChange={(event) => changeRoundType(round.id, event.target.value as RoundType)}
+                  >
+                    {roundTypeOrder.map((type) => (
+                      <option
+                        disabled={game.rounds.some(
+                          (candidate) => candidate.id !== round.id && candidate.type === type
+                        )}
+                        key={type}
+                        value={type}
+                      >
+                        {roundTypeLabel(type)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  aria-label={`Odebrat kolo ${index + 1}`}
+                  className="button-compact"
+                  type="button"
+                  onClick={() => removeRound(round.id)}
+                >
+                  Odebrat
+                </button>
+              </div>
+            ))}
+          </section>
+
+          <section className="editor-section">
+            <div className="section-heading-row">
+              <h2>Import a export</h2>
+              <div className="inline-actions">
+                <button type="button" onClick={handleExportJson}>
+                  Exportovat JSON
+                </button>
+                <label className="button-like">
+                  <span>Importovat JSON</span>
+                  <input
+                    aria-label="Importovat JSON hry"
+                    accept="application/json,.json"
+                    type="file"
+                    onChange={(event) => void handleImportJson(event)}
+                  />
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section className="editor-section">
+            <h2>Hlavní nastavení</h2>
+            <label className="field-stack">
+              <span>Název hry</span>
+              <input
+                value={game.title}
+                onChange={(event) =>
+                  setGame((current) => ({ ...current, title: event.target.value }))
+                }
+              />
+            </label>
+
+            <TeamSetup
+              teams={game.teams}
+              onChange={(teams) => setGame((current) => ({ ...current, teams }))}
+            />
+          </section>
+
+          <section className="editor-section">
+            <div className="section-heading-row">
+              <h2>Zvukové efekty</h2>
+              <label className="checkbox-field">
+                <input
+                  checked={game.soundEffects.enabled}
+                  type="checkbox"
+                  onChange={(event) => setSoundEffectsEnabled(event.target.checked)}
+                />
+                <span>Zapnout efekty pro tuto hru</span>
+              </label>
+            </div>
+            <div className="sound-effect-grid">
+              {soundEffectLabels.map((effect) => (
+                <AudioUploadField
+                  key={effect.key}
+                  label={effect.label}
+                  audio={game.soundEffects.effects[effect.key]}
                   audioAssets={audioAssets}
-                  onChange={updateQuestion}
+                  onChange={(audio) => updateSoundEffect(effect.key, audio)}
                   onUploadAudio={onUploadAudio}
                 />
               ))}
             </div>
           </section>
-        ))}
-      </section>
+        </section>
+      ) : null}
 
-      <section className="editor-section">
-        <h2>Druhé kolo: poslech</h2>
-        <label className="field-stack">
-          <span>Žánr / sloupec</span>
-          <input
-            value={game.listeningGenres[0]?.title ?? ""}
-            onChange={(event) =>
-              setGame((current) => {
-                const genre = current.listeningGenres[0] ?? { id: makeId("genre"), title: "" };
-                const nextGenre = { ...genre, title: event.target.value };
-                return {
-                  ...current,
-                  listeningGenres: [
-                    nextGenre,
-                    ...current.listeningGenres.filter((candidate) => candidate.id !== genre.id)
-                  ],
-                  listeningItems: current.listeningItems.map((item) => ({
-                    ...item,
-                    genreId: item.genreId ?? nextGenre.id,
-                    categoryId: item.categoryId ?? nextGenre.id
-                  }))
-                };
-              })
-            }
-          />
-        </label>
-        <CategoryEditor
-          title="Žánry poslechového kola"
-          addLabel="Přidat žánr"
-          emptyLabel="Zatím nejsou přidané žádné žánry."
-          deleteMessage="Smazáním žánru se smažou i jeho poslechové položky. Pokračovat?"
-          groups={game.listeningGenres}
-          onAdd={addGenre}
-          onRename={(genreId, title) =>
-            setGame((current) => ({
-              ...current,
-              listeningGenres: current.listeningGenres.map((genre) =>
-                genre.id === genreId ? { ...genre, title } : genre
-              )
-            }))
-          }
-          onRemove={(genreId) =>
-            setGame((current) => ({
-              ...current,
-              listeningGenres: current.listeningGenres.filter((genre) => genre.id !== genreId),
-              listeningItems: current.listeningItems.filter((item) => item.genreId !== genreId)
-            }))
-          }
-        />
-        <div className="section-heading-row">
-          <h3>Poslechové položky</h3>
-          <button className="button-compact" type="button" onClick={addListeningItem}>
-            Přidat poslechovou položku
-          </button>
-          <button className="button-compact" type="button" onClick={addListeningItem}>
-            Přidat poslechový track
-          </button>
-        </div>
-        <div className="item-list">
-          {game.listeningItems.map((item) => (
-            <ListeningItemEditor
-              key={item.id}
-              item={item}
-              genres={game.listeningGenres}
-              audioAssets={audioAssets}
-              onChange={updateListeningItem}
-              onUploadAudio={onUploadAudio}
-              onRemove={() =>
+      {activeTab === "question" ? (
+        <section
+          aria-labelledby="editor-tab-question"
+          className="editor-tab-panel"
+          id="editor-panel-question"
+          role="tabpanel"
+        >
+          <section className="editor-section">
+            <h2>První kolo</h2>
+            <CategoryEditor
+              title="Kategorie prvního kola"
+              addLabel="Přidat kategorii"
+              emptyLabel="Zatím nejsou přidané žádné kategorie."
+              deleteMessage="Smazáním kategorie se smažou i její otázky. Pokračovat?"
+              groups={game.categories}
+              onAdd={addCategory}
+              onRename={(categoryId, title) =>
                 setGame((current) => ({
                   ...current,
-                  listeningItems: current.listeningItems.filter((currentItem) => currentItem.id !== item.id)
+                  categories: current.categories.map((category) =>
+                    category.id === categoryId ? { ...category, title } : category
+                  )
+                }))
+              }
+              onRemove={(categoryId) =>
+                setGame((current) => ({
+                  ...current,
+                  categories: current.categories.filter((category) => category.id !== categoryId),
+                  questions: current.questions.filter((question) => question.categoryId !== categoryId)
                 }))
               }
             />
-          ))}
-        </div>
-      </section>
+            {questionsByCategory.map(({ category, questions }) => (
+              <section className="editor-section nested-section" key={category.id}>
+                <h3>{category.title || "Kategorie bez názvu"}</h3>
+                <div className="item-list">
+                  {questions.map((question) => (
+                    <FirstRoundQuestionEditor
+                      key={question.id}
+                      question={question}
+                      categoryTitle={category.title || "bez názvu"}
+                      audioAssets={audioAssets}
+                      onChange={updateQuestion}
+                      onUploadAudio={onUploadAudio}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </section>
+        </section>
+      ) : null}
 
-      <section className="editor-section">
-        <div className="section-heading-row">
-          <h2>Třetí kolo: společný jmenovatel</h2>
-          <button className="button-compact" type="button" onClick={addCommonDenominatorItem}>
-            Přidat společný jmenovatel
-          </button>
-          <button className="button-compact" type="button" onClick={addCommonDenominatorItem}>
-            Přidat položku
-          </button>
-        </div>
-        <div className="item-list">
-          {game.commonDenominatorItems.map((item, index) => (
-            <article className="editor-card" key={item.id}>
-              <label className="field-stack">
-                <span>{`Název položky společného jmenovatele ${index + 1}`}</span>
-                <input
-                  value={item.title}
-                  onChange={(event) =>
-                    updateCommonDenominatorItem({ ...item, title: event.target.value })
-                  }
-                />
-              </label>
-              <label className="field-stack">
-                <span>Clues</span>
-                <textarea
-                  value={item.clues.map((clue) => clue.text ?? clue.prompt ?? "").join("\n")}
-                  onChange={(event) =>
-                    updateCommonDenominatorItem({
-                      ...item,
-                      clues: event.target.value.split("\n").map((text, clueIndex) => ({
-                        id: item.clues[clueIndex]?.id ?? makeId("clue"),
-                        text,
-                        prompt: text,
-                        order: clueIndex + 1
+      {activeTab === "listening" ? (
+        <section
+          aria-labelledby="editor-tab-listening"
+          className="editor-tab-panel"
+          id="editor-panel-listening"
+          role="tabpanel"
+        >
+          <section className="editor-section">
+            <h2>Druhé kolo: poslech</h2>
+            <label className="field-stack">
+              <span>Žánr / sloupec</span>
+              <input
+                value={game.listeningGenres[0]?.title ?? ""}
+                onChange={(event) =>
+                  setGame((current) => {
+                    const genre = current.listeningGenres[0] ?? { id: makeId("genre"), title: "" };
+                    const nextGenre = { ...genre, title: event.target.value };
+                    return {
+                      ...current,
+                      listeningGenres: [
+                        nextGenre,
+                        ...current.listeningGenres.filter((candidate) => candidate.id !== genre.id)
+                      ],
+                      listeningItems: current.listeningItems.map((item) => ({
+                        ...item,
+                        genreId: item.genreId ?? nextGenre.id,
+                        categoryId: item.categoryId ?? nextGenre.id
                       }))
-                    })
-                  }
-                />
-              </label>
-              <label className="field-stack">
-                <span>Správná odpověď</span>
-                <input
-                  value={item.answer}
-                  onChange={(event) =>
-                    updateCommonDenominatorItem({ ...item, answer: event.target.value })
-                  }
-                />
-              </label>
-              <label className="field-stack">
-                <span>Vysvětlení pro moderátora</span>
-                <textarea
-                  value={item.explanation ?? item.moderatorNote ?? ""}
-                  onChange={(event) =>
-                    updateCommonDenominatorItem({
-                      ...item,
-                      explanation: event.target.value || undefined,
-                      moderatorNote: event.target.value || undefined
-                    })
-                  }
-                />
-              </label>
-              <label className="field-stack">
-                <span>Nápověda</span>
-                <input
-                  value={item.hint ?? ""}
-                  onChange={(event) =>
-                    updateCommonDenominatorItem({
-                      ...item,
-                      hint: event.target.value || undefined
-                    })
-                  }
-                />
-              </label>
-              <CommonDenominatorEditor
-                round={{ answer: item.answer, clues: item.clues }}
-                onChange={(commonDenominator) =>
-                  updateCommonDenominatorItem({
-                    ...item,
-                    answer: commonDenominator.answer,
-                    clues: commonDenominator.clues
-                  })
-                }
-                audioAssets={audioAssets}
-                onUploadAudio={onUploadAudio}
-                onAddClue={() =>
-                  updateCommonDenominatorItem({
-                    ...item,
-                    clues: [...item.clues, { id: makeId("clue"), text: "" }]
-                  })
-                }
-                onRemoveClue={(clueId) =>
-                  updateCommonDenominatorItem({
-                    ...item,
-                    clues: item.clues.filter((clue) => clue.id !== clueId)
+                    };
                   })
                 }
               />
-            </article>
-          ))}
-        </div>
-      </section>
+            </label>
+            <CategoryEditor
+              title="Žánry poslechového kola"
+              addLabel="Přidat žánr"
+              emptyLabel="Zatím nejsou přidané žádné žánry."
+              deleteMessage="Smazáním žánru se smažou i jeho poslechové položky. Pokračovat?"
+              groups={game.listeningGenres}
+              onAdd={addGenre}
+              onRename={(genreId, title) =>
+                setGame((current) => ({
+                  ...current,
+                  listeningGenres: current.listeningGenres.map((genre) =>
+                    genre.id === genreId ? { ...genre, title } : genre
+                  )
+                }))
+              }
+              onRemove={(genreId) =>
+                setGame((current) => ({
+                  ...current,
+                  listeningGenres: current.listeningGenres.filter((genre) => genre.id !== genreId),
+                  listeningItems: current.listeningItems.filter((item) => item.genreId !== genreId)
+                }))
+              }
+            />
+            <div className="section-heading-row">
+              <h3>Poslechové položky</h3>
+              <button className="button-compact" type="button" onClick={addListeningItem}>
+                Přidat poslechovou položku
+              </button>
+              <button className="button-compact" type="button" onClick={addListeningItem}>
+                Přidat poslechový track
+              </button>
+            </div>
+            <div className="item-list">
+              {game.listeningItems.map((item) => (
+                <ListeningItemEditor
+                  key={item.id}
+                  item={item}
+                  genres={game.listeningGenres}
+                  audioAssets={audioAssets}
+                  onChange={updateListeningItem}
+                  onUploadAudio={onUploadAudio}
+                  onRemove={() =>
+                    setGame((current) => ({
+                      ...current,
+                      listeningItems: current.listeningItems.filter((currentItem) => currentItem.id !== item.id)
+                    }))
+                  }
+                />
+              ))}
+            </div>
+          </section>
+        </section>
+      ) : null}
 
-      <div className="inline-actions">
+      {activeTab === "common-denominator" ? (
+        <section
+          aria-labelledby="editor-tab-common-denominator"
+          className="editor-tab-panel"
+          id="editor-panel-common-denominator"
+          role="tabpanel"
+        >
+          <section className="editor-section">
+            <div className="section-heading-row">
+              <h2>Třetí kolo: společný jmenovatel</h2>
+              <button className="button-compact" type="button" onClick={addCommonDenominatorItem}>
+                Přidat společný jmenovatel
+              </button>
+              <button className="button-compact" type="button" onClick={addCommonDenominatorItem}>
+                Přidat položku
+              </button>
+            </div>
+            <div className="item-list">
+              {game.commonDenominatorItems.map((item, index) => (
+                <article className="editor-card" key={item.id}>
+                  <label className="field-stack">
+                    <span>{`Název položky společného jmenovatele ${index + 1}`}</span>
+                    <input
+                      value={item.title}
+                      onChange={(event) =>
+                        updateCommonDenominatorItem({ ...item, title: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="field-stack">
+                    <span>Clues</span>
+                    <textarea
+                      value={item.clues.map((clue) => clue.text ?? clue.prompt ?? "").join("\n")}
+                      onChange={(event) =>
+                        updateCommonDenominatorItem({
+                          ...item,
+                          clues: event.target.value.split("\n").map((text, clueIndex) => ({
+                            id: item.clues[clueIndex]?.id ?? makeId("clue"),
+                            text,
+                            prompt: text,
+                            order: clueIndex + 1
+                          }))
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="field-stack">
+                    <span>Správná odpověď</span>
+                    <input
+                      value={item.answer}
+                      onChange={(event) =>
+                        updateCommonDenominatorItem({ ...item, answer: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="field-stack">
+                    <span>Vysvětlení pro moderátora</span>
+                    <textarea
+                      value={item.explanation ?? item.moderatorNote ?? ""}
+                      onChange={(event) =>
+                        updateCommonDenominatorItem({
+                          ...item,
+                          explanation: event.target.value || undefined,
+                          moderatorNote: event.target.value || undefined
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="field-stack">
+                    <span>Nápověda</span>
+                    <input
+                      value={item.hint ?? ""}
+                      onChange={(event) =>
+                        updateCommonDenominatorItem({
+                          ...item,
+                          hint: event.target.value || undefined
+                        })
+                      }
+                    />
+                  </label>
+                  <CommonDenominatorEditor
+                    round={{ answer: item.answer, clues: item.clues }}
+                    onChange={(commonDenominator) =>
+                      updateCommonDenominatorItem({
+                        ...item,
+                        answer: commonDenominator.answer,
+                        clues: commonDenominator.clues
+                      })
+                    }
+                    audioAssets={audioAssets}
+                    onUploadAudio={onUploadAudio}
+                    onAddClue={() =>
+                      updateCommonDenominatorItem({
+                        ...item,
+                        clues: [...item.clues, { id: makeId("clue"), text: "" }]
+                      })
+                    }
+                    onRemoveClue={(clueId) =>
+                      updateCommonDenominatorItem({
+                        ...item,
+                        clues: item.clues.filter((clue) => clue.id !== clueId)
+                      })
+                    }
+                  />
+                </article>
+              ))}
+            </div>
+          </section>
+        </section>
+      ) : null}
+
+      <div className="editor-save-bar">
         <button type="submit" disabled={isSaving}>
           {isSaving ? "Ukládám..." : "Uložit hru"}
         </button>

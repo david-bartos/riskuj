@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { demoGame } from "./data/demoGame";
@@ -40,16 +40,15 @@ describe("App", () => {
     vi.unstubAllGlobals();
   });
 
-  it("zobrazí domovskou stránku s českými vstupy do hry", () => {
+  it("na / rovnou zobrazí admin bez domovské stránky a globální navigace", async () => {
     window.history.pushState({}, "", "/");
 
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "Hudební RISKuj!" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Riskuj!" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Hudební RISKuj!" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Editor hry" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Spustit hru" })).toBeInTheDocument();
+    expect(await screen.findByLabelText("Editor hry")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Editor hry" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Hudební RISKuj!" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Hlavní navigace" })).not.toBeInTheDocument();
   });
 
   it("zobrazí editor hry na /admin", async () => {
@@ -77,17 +76,43 @@ describe("App", () => {
     expect(screen.getByText("Upravte otázky, poslechové ukázky a třetí kolo.")).toBeInTheDocument();
     expect(await screen.findByLabelText("Editor hry")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Uložit hru" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Hlavní navigace" })).not.toBeInTheDocument();
   });
 
-  it("zobrazí herní tabuli na /play bez redundantního odkazu na aktuální hru", async () => {
+  it("doplní tooltipy pro interaktivní prvky", async () => {
+    window.history.pushState({}, "", "/");
+
+    render(<App />);
+
+    const gameSelect = await screen.findByLabelText("Načíst existující hru");
+    const newGameButton = screen.getByRole("button", { name: "Nová hra" });
+    const settingsTab = screen.getByRole("tab", { name: "Nastavení" });
+
+    await waitFor(() => {
+      expect(gameSelect).toHaveAttribute(
+        "title",
+        "Výběrem změníte hodnotu pole „Načíst existující hru“. Změna se projeví v aktuálně otevřené hře nebo editoru."
+      );
+      expect(newGameButton).toHaveAttribute(
+        "title",
+        "Kliknutím založíte novou prázdnou hru v editoru. Uloží se až tlačítkem Uložit hru."
+      );
+      expect(settingsTab).toHaveAttribute(
+        "title",
+        "Kliknutím otevřete záložku „Nastavení“. Obsah editoru nebo hry se přepne bez automatického uložení."
+      );
+    });
+  });
+
+  it("zobrazí herní tabuli na /play bez globální navigace", async () => {
     window.history.pushState({}, "", "/play/riskuj-2026-06-06");
 
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "Riskuj!" })).toBeInTheDocument();
-    expect(screen.getByRole("navigation", { name: "Hlavní navigace" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Domů" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Editor" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Hlavní navigace" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Domů" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Editor" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Riskuj 6.6" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("tablist", { name: "Kola soutěže" })).toHaveLength(1);
     expect(
@@ -96,22 +121,36 @@ describe("App", () => {
     expect(screen.getByRole("region", { name: "Skóre týmů" })).toBeInTheDocument();
   });
 
-  it("naviguje z domovské stránky přímo do seed hry Riskuj 6.6", () => {
-    window.history.pushState({}, "", "/");
+  it("umožní ze spuštěného testu přejít zpět do adminu", async () => {
+    window.history.pushState({}, "", "/play/riskuj-2026-06-06");
 
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: "Spustit hru" }));
 
-    expect(window.location.pathname).toBe("/play/riskuj-2026-06-06");
+    fireEvent.click(await screen.findByRole("button", { name: "Admin" }));
+
+    expect(window.location.pathname).toBe("/");
+    expect(await screen.findByLabelText("Editor hry")).toBeInTheDocument();
   });
 
-  it("naviguje z domovské stránky do editoru bez reloadu", () => {
-    window.history.pushState({}, "", "/");
+  it("umožní z adminu pokračovat v rozehrané hře bez ztráty vybrané dlaždice", async () => {
+    window.history.pushState({}, "", "/play/riskuj-2026-06-06");
 
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: "Editor hry" }));
 
-    expect(window.location.pathname).toBe("/admin");
-    expect(screen.getByRole("heading", { name: "Editor hry" })).toBeInTheDocument();
+    const tile = await screen.findByRole("button", {
+      name: /Hudební otázky 1 za 1 000 Kč/i
+    });
+    fireEvent.click(tile);
+    expect(tile).toHaveAttribute("data-state", "selected");
+
+    fireEvent.click(screen.getByRole("button", { name: "Admin" }));
+    expect(await screen.findByLabelText("Editor hry")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Vrátit se do hry" }));
+
+    expect(window.location.pathname).toBe("/play/riskuj-2026-06-06");
+    expect(
+      await screen.findByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i })
+    ).toHaveAttribute("data-state", "selected");
   });
 });

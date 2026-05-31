@@ -23,6 +23,20 @@ describe("playSfx", () => {
     expect(play).toHaveBeenCalledTimes(1);
   });
 
+  it("plays a game-configured MP3 path", () => {
+    const play = vi.fn().mockResolvedValue(undefined);
+    const audioConstructor = vi.fn().mockImplementation((src: string) => ({
+      src,
+      play
+    }));
+    globalThis.Audio = audioConstructor as unknown as typeof Audio;
+
+    playSfx("/uploads/custom-correct.mp3");
+
+    expect(audioConstructor).toHaveBeenCalledWith("/uploads/custom-correct.mp3");
+    expect(play).toHaveBeenCalledTimes(1);
+  });
+
   it("does not throw when Audio is unavailable", () => {
     globalThis.Audio = undefined as unknown as typeof Audio;
 

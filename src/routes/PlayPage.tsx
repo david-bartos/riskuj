@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { gamesClient } from "../api/gamesClient";
-import { playSfx, type SfxName } from "../audio/sfx";
+import { playSfx } from "../audio/sfx";
 import CommonDenominatorRoundScreen from "../components/game/CommonDenominatorRoundScreen";
 import ListeningRoundScreen from "../components/game/ListeningRoundScreen";
 import TeamScoreboard from "../components/game/TeamScoreboard";
@@ -10,6 +10,7 @@ import type {
   CommonDenominatorItem,
   CommonDenominatorRound,
   Game,
+  GameSoundEffectKey,
   ListeningItem,
   ListeningRound,
   QuestionItem,
@@ -20,6 +21,7 @@ import { listeningScoreOptions } from "../types/game";
 
 type PlayPageProps = {
   gameId: string;
+  isActive?: boolean;
   onExit?: () => void;
 };
 
@@ -27,6 +29,12 @@ type ActiveContent =
   | { type: "question"; round: QuestionRound; item: QuestionItem }
   | { type: "listening"; round: ListeningRound; item: ListeningItem }
   | { type: "common-denominator"; round: CommonDenominatorRound; item: CommonDenominatorItem };
+
+type FinalPlacement = {
+  rank: number;
+  score: number;
+  teams: Array<{ id: string; name: string; color?: string }>;
+};
 
 function formatMoney(value: number) {
   return `${new Intl.NumberFormat("cs-CZ").format(value).replace(/\u00a0/g, " ")} Kč`;
@@ -82,12 +90,54 @@ function AudioPlayer({ src }: { src: string }) {
   return <audio aria-label="Přehrát audio ukázku" controls src={src} />;
 }
 
-function PresenterView({ game, onExit }: { game: Game; onExit?: () => void }) {
+function finalPlacements(
+  teams: Game["teams"],
+  scores: Array<{ teamId: string; score: number }>
+): FinalPlacement[] {
+  const scoreByTeam = new Map(scores.map((entry) => [entry.teamId, entry.score]));
+  const rankedTeams = teams
+    .map((team) => ({ ...team, score: scoreByTeam.get(team.id) ?? 0 }))
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+
+      return left.name.localeCompare(right.name, "cs-CZ");
+    });
+
+  const placements: FinalPlacement[] = [];
+  let rank = 1;
+
+  for (let index = 0; index < rankedTeams.length; ) {
+    const score = rankedTeams[index].score;
+    const tiedTeams = rankedTeams.filter((team) => team.score === score);
+    placements.push({
+      rank,
+      score,
+      teams: tiedTeams.map(({ score: _score, ...team }) => team)
+    });
+    index += tiedTeams.length;
+    rank += tiedTeams.length;
+  }
+
+  return placements.sort((left, right) => right.rank - left.rank);
+}
+
+function PresenterView({
+  game,
+  isActive = true,
+  onExit
+}: {
+  game: Game;
+  isActive?: boolean;
+  onExit?: () => void;
+}) {
   const presenterRef = useRef<HTMLElement>(null);
   const { isFullscreen, isSupported, toggleFullscreen } = useFullscreen(presenterRef);
   const flow = usePresenterFlow(game);
-  const [isSoundEnabled] = useState(true);
   const [activeRoundIndex, setActiveRoundIndex] = useState(0);
+  const [isFinalDialogOpen, setIsFinalDialogOpen] = useState(false);
+  const [revealedFinalGroups, setRevealedFinalGroups] = useState(0);
   const activeRound = game.rounds[activeRoundIndex] ?? game.rounds[0];
 
   const activeContent = useMemo(
@@ -99,25 +149,78 @@ function PresenterView({ game, onExit }: { game: Game; onExit?: () => void }) {
       ),
     [flow.session.activeItem, game]
   );
+  const finalGroups = useMemo(
+    () => finalPlacements(game.teams, flow.session.teamScores),
+    [game.teams, flow.session.teamScores]
+  );
+  const visibleFinalGroups = finalGroups.slice(0, revealedFinalGroups);
+
+  function playGameEffect(key: GameSoundEffectKey) {
+    if (!game.soundEffects?.enabled) {
+      return;
+    }
+
+    playSfx(game.soundEffects.effects[key]);
+  }
+
+  function willRevealAnswerOnAdvance() {
+    if (!activeContent || flow.session.presenterStep !== "prompt-visible") {
+      return false;
+    }
+
+    if (activeContent.type !== "common-denominator") {
+      return true;
+    }
+
+    return activeContent.item.clues.every((clue) => flow.session.revealedClueIds.includes(clue.id));
+  }
+
+  function advancePresenter() {
+    if (isFinalDialogOpen) {
+      revealNextFinalGroup();
+      return;
+    }
+
+    if (flow.session.presenterStep === "item-selected") {
+      playGameEffect("questionOpened");
+    } else if (willRevealAnswerOnAdvance()) {
+      playGameEffect("answerRevealed");
+    }
+
+    flow.advance();
+  }
+
+  function openFinalDialog() {
+    setIsFinalDialogOpen(true);
+    setRevealedFinalGroups(0);
+  }
+
+  function revealNextFinalGroup() {
+    const nextGroup = finalGroups[revealedFinalGroups];
+    if (!nextGroup) {
+      return;
+    }
+
+    playGameEffect(nextGroup.rank === 1 ? "firstPlaceRevealed" : "placementRevealed");
+    setRevealedFinalGroups((current) => Math.min(current + 1, finalGroups.length));
+  }
 
   useEffect(() => {
+    if (!isActive) {
+      return undefined;
+    }
+
     function handleEnter(event: KeyboardEvent) {
       if (event.key === "Enter") {
         event.preventDefault();
         event.stopPropagation();
-        flow.advance();
+        advancePresenter();
       }
     }
 
     window.addEventListener("keydown", handleEnter);
     return () => window.removeEventListener("keydown", handleEnter);
-  }, [flow]);
-
-  function playPresenterSfx(name: SfxName) {
-    if (isSoundEnabled) {
-      playSfx(name);
-    }
-  }
+  }, [flow, activeContent, game, isActive]);
 
   function isActiveSelectedItem(roundId: string, itemId: string) {
     return (
@@ -150,17 +253,40 @@ function PresenterView({ game, onExit }: { game: Game; onExit?: () => void }) {
 
   function selectItem(roundId: string, roundType: RoundType, itemId: string) {
     if (isActiveSelectedItem(roundId, itemId)) {
+      playGameEffect("questionOpened");
       flow.advance();
       return;
     }
 
     if (flow.session.completedItemIds.includes(itemId)) {
       flow.reopenItemForCorrection(roundId, roundType, itemId);
+      playGameEffect("questionOpened");
       return;
     }
 
     flow.selectItem(roundId, roundType, itemId);
-    playPresenterSfx("open");
+    playGameEffect("questionSelected");
+  }
+
+  function awardToTeam(teamId: string) {
+    playGameEffect("correctAnswer");
+    flow.awardActiveItemToTeam(teamId);
+  }
+
+  function markUnanswered() {
+    playGameEffect("wrongAnswer");
+    flow.markActiveItemUnanswered();
+  }
+
+  function applyListeningScores() {
+    const hasScore = game.teams.some((team) => (flow.session.listeningScoringDraft[team.id] ?? 0) > 0);
+    playGameEffect(hasScore ? "correctAnswer" : "wrongAnswer");
+    flow.applyListeningScores();
+  }
+
+  function awardCommonDenominator(teamId: string) {
+    playGameEffect("correctAnswer");
+    flow.awardCommonDenominator(teamId);
   }
 
   function tileStyle(itemId: string) {
@@ -195,6 +321,28 @@ function PresenterView({ game, onExit }: { game: Game; onExit?: () => void }) {
               </button>
             ))}
           </nav>
+          <button
+            className="round-tab-button presenter-end-button"
+            type="button"
+            onClick={openFinalDialog}
+          >
+            Konec
+          </button>
+          <button
+            aria-label="Admin"
+            className="round-tab-button presenter-admin-button"
+            type="button"
+            onClick={() => {
+              if (onExit) {
+                onExit();
+                return;
+              }
+
+              window.history.pushState({}, "", "/");
+            }}
+          >
+            Admin
+          </button>
         </div>
         <TeamScoreboard
           teams={game.teams}
@@ -337,7 +485,7 @@ function PresenterView({ game, onExit }: { game: Game; onExit?: () => void }) {
 
             <div className="presenter-dialog-actions">
               {!flow.answerVisible ? (
-                <button type="button" onClick={flow.advance}>
+                <button type="button" onClick={advancePresenter}>
                   Zobrazit odpověď
                 </button>
               ) : null}
@@ -352,13 +500,13 @@ function PresenterView({ game, onExit }: { game: Game; onExit?: () => void }) {
                         key={team.id}
                         className="team-award-button"
                         style={{ backgroundColor: team.color }}
-                        onClick={() => flow.awardActiveItemToTeam(team.id)}
+                        onClick={() => awardToTeam(team.id)}
                       >
-                        {team.name.toLocaleLowerCase("cs-CZ")}
+                        {team.name}
                       </button>
                     );
                   })}
-                  <button type="button" className="no-award-button" onClick={flow.markActiveItemUnanswered}>
+                  <button type="button" className="no-award-button" onClick={markUnanswered}>
                     Nikdo neuhodl
                   </button>
                   <button type="button" onClick={() => flow.returnToBoard()}>
@@ -386,7 +534,7 @@ function PresenterView({ game, onExit }: { game: Game; onExit?: () => void }) {
                       </select>
                     </label>
                   ))}
-                  <button type="button" onClick={flow.applyListeningScores}>
+                  <button type="button" onClick={applyListeningScores}>
                     Zapsat poslechové body
                   </button>
                 </div>
@@ -400,12 +548,12 @@ function PresenterView({ game, onExit }: { game: Game; onExit?: () => void }) {
                       key={team.id}
                       className="team-award-button"
                       style={{ backgroundColor: team.color }}
-                      onClick={() => flow.awardCommonDenominator(team.id)}
+                      onClick={() => awardCommonDenominator(team.id)}
                     >
-                      {team.name.toLocaleLowerCase("cs-CZ")}
+                      {team.name}
                     </button>
                   ))}
-                  <button type="button" className="no-award-button" onClick={flow.markActiveItemUnanswered}>
+                  <button type="button" className="no-award-button" onClick={markUnanswered}>
                     Nikdo neuhodl
                   </button>
                   <button type="button" onClick={() => flow.returnToBoard()}>
@@ -417,11 +565,66 @@ function PresenterView({ game, onExit }: { game: Game; onExit?: () => void }) {
           </section>
         </div>
       ) : null}
+
+      {isFinalDialogOpen ? (
+        <div className="presenter-dialog-backdrop final-dialog-backdrop">
+          <section
+            className="presenter-dialog final-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="final-dialog-title"
+          >
+            <div className="confetti-layer" aria-hidden="true">
+              {Array.from({ length: 28 }, (_, index) => (
+                <span key={index} />
+              ))}
+            </div>
+            <div className="presenter-dialog-content final-dialog-content">
+              <p className="stage-label">Vyhodnocení hry</p>
+              <h2 id="final-dialog-title">Konečné pořadí</h2>
+              <div className="final-placements" aria-live="polite">
+                {visibleFinalGroups.length === 0 ? (
+                  <p className="final-placeholder">Postupně odkryjte umístění od posledního místa.</p>
+                ) : null}
+                {visibleFinalGroups.map((group) => (
+                  <article
+                    className="final-placement-card"
+                    data-rank={group.rank === 1 ? "winner" : "place"}
+                    key={`${group.rank}-${group.score}`}
+                  >
+                    <strong>{group.rank}. místo</strong>
+                    <span>{formatMoney(group.score)}</span>
+                    <div className="final-placement-teams">
+                      {group.teams.map((team) => (
+                        <span key={team.id} style={{ borderColor: team.color, color: team.color }}>
+                          {team.name}
+                        </span>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+            <div className="presenter-dialog-actions final-dialog-actions">
+              <button
+                type="button"
+                disabled={revealedFinalGroups >= finalGroups.length}
+                onClick={revealNextFinalGroup}
+              >
+                Odkrýt další umístění
+              </button>
+              <button type="button" onClick={() => setIsFinalDialogOpen(false)}>
+                Zpět na tabuli
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }
 
-export function PlayPage({ gameId, onExit }: PlayPageProps) {
+export function PlayPage({ gameId, isActive = true, onExit }: PlayPageProps) {
   const [game, setGame] = useState<Game | null>(null);
   const [error, setError] = useState("");
 
@@ -466,7 +669,7 @@ export function PlayPage({ gameId, onExit }: PlayPageProps) {
     );
   }
 
-  return <PresenterView game={game} onExit={onExit} />;
+  return <PresenterView game={game} isActive={isActive} onExit={onExit} />;
 }
 
 export default PlayPage;
