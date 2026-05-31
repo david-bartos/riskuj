@@ -56,6 +56,24 @@ describe("usePresenterFlow", () => {
     expect(result.current.scoreForTeam("team-2")).toBe(500);
   });
 
+  it("umí vrátit poslední akce a drží historii posledních 10 změn", () => {
+    const { result } = renderHook(() => usePresenterFlow(demoGame));
+
+    for (let index = 0; index < 11; index += 1) {
+      act(() => result.current.adjustScore("team-2", 100));
+    }
+    expect(result.current.scoreForTeam("team-2")).toBe(1100);
+
+    for (let index = 0; index < 10; index += 1) {
+      act(() => result.current.undo());
+    }
+    expect(result.current.scoreForTeam("team-2")).toBe(100);
+    expect(result.current.canUndo).toBe(false);
+
+    act(() => result.current.undo());
+    expect(result.current.scoreForTeam("team-2")).toBe(100);
+  });
+
   it("poslechové skórování přičte vybrané hodnoty všem týmům najednou", () => {
     const { result } = renderHook(() => usePresenterFlow(demoGame));
     const listeningRound = demoGame.rounds[1];

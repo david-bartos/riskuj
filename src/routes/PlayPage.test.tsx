@@ -360,9 +360,12 @@ describe("PlayPage", () => {
 
     await screen.findByRole("heading", { name: "Riskuj!" });
     fireEvent.click(screen.getByRole("tab", { name: "3" }));
-    fireEvent.click(screen.getByRole("button", { name: /Společný jmenovatel: Human/i }));
+    expect(screen.queryByRole("button", { name: /Human/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Společný jmenovatel 1 za 5 000 Kč/i }));
     fireEvent.keyDown(window, { key: "Enter" });
 
+    expect(await screen.findByRole("heading", { name: "Nápovědy" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Zobrazit další nápovědu" })).toBeInTheDocument();
     expect(await screen.findByText("Bruce Springsteen")).toBeInTheDocument();
     expect(screen.queryByText("The Killers")).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain("HUMAN");
@@ -375,6 +378,7 @@ describe("PlayPage", () => {
     fireEvent.keyDown(window, { key: "Enter" });
     expect(await screen.findByText("Rag’n’Bone Man")).toBeInTheDocument();
     expect(document.body.textContent).not.toContain("HUMAN");
+    expect(screen.getByRole("button", { name: "Zobrazit odpověď" })).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "Enter" });
     expect(await screen.findByText("HUMAN")).toBeInTheDocument();

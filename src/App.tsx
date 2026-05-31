@@ -23,6 +23,7 @@ export default function App() {
     const initialRoute = parseRoute(window.location.pathname);
     return initialRoute.name === "play" ? initialRoute.gameId : "";
   });
+  const [playRunId, setPlayRunId] = useState(0);
 
   useEffect(() => {
     const handlePopState = () => setPath(window.location.pathname);
@@ -50,7 +51,11 @@ export default function App() {
       {route.name === "admin" ? (
         <AdminPage
           runningGameId={runningGameId}
-          onNavigate={navigate}
+          onStartGame={(gameId) => {
+            setRunningGameId(gameId);
+            setPlayRunId((current) => current + 1);
+            navigate(`/play/${encodeURIComponent(gameId)}`);
+          }}
           onResumeGame={() => {
             if (runningGameId) {
               navigate(`/play/${encodeURIComponent(runningGameId)}`);
@@ -61,10 +66,11 @@ export default function App() {
       {playGameId ? (
         <div hidden={route.name !== "play"}>
           <PlayPage
-            key={playGameId}
+            key={`${playGameId}:${playRunId}`}
             gameId={playGameId}
             isActive={route.name === "play"}
             onExit={() => navigate("/")}
+            onFinish={() => setRunningGameId("")}
           />
         </div>
       ) : null}

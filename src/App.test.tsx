@@ -153,4 +153,103 @@ describe("App", () => {
       await screen.findByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i })
     ).toHaveAttribute("data-state", "selected");
   });
+
+  it("po ukončení hry nenabízí návrat do předchozí rozehrané hry", async () => {
+    window.history.pushState({}, "", "/play/riskuj-2026-06-06");
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Konec" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Zpět na tabuli" }));
+    fireEvent.click(screen.getByRole("button", { name: "Admin" }));
+
+    expect(window.location.pathname).toBe("/");
+    expect(await screen.findByLabelText("Editor hry")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Vrátit se do hry" })).not.toBeInTheDocument();
+  });
+
+  it("po potvrzení spuštění jiné hry otevře nově vybranou hru", async () => {
+    const runningGame = { ...demoGame, id: "running-game", title: "Rozehraná hra" };
+    const nextGame = { ...demoGame, id: "next-game", title: "Nová vybraná hra" };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url === "/api/games") {
+          return Response.json([
+            {
+              id: runningGame.id,
+              title: runningGame.title,
+              updatedAt: runningGame.updatedAt,
+              roundCount: runningGame.rounds.length
+            },
+            {
+              id: nextGame.id,
+              title: nextGame.title,
+              updatedAt: nextGame.updatedAt,
+              roundCount: nextGame.rounds.length
+            }
+          ]);
+        }
+
+        if (url === "/api/games/running-game") {
+          return Response.json(runningGame);
+        }
+
+        if (url === "/api/games/next-game") {
+          return Response.json(nextGame);
+        }
+
+        if (url === "/api/audio-assets") {
+          return Response.json([]);
+        }
+
+        return new Response("not found", { status: 404 });
+      })
+    );
+    window.history.pushState({}, "", "/play/running-game");
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Admin" }));
+    const gameSelect = await screen.findByLabelText("Načíst existující hru");
+    fireEvent.change(gameSelect, { target: { value: "next-game" } });
+    fireEvent.click(screen.getByRole("button", { name: "Spustit novou hru" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ano" }));
+
+    expect(window.location.pathname).toBe("/play/next-game");
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith("/api/games/next-game");
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Admin" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Vrátit se do hry" }));
+    expect(window.location.pathname).toBe("/play/next-game");
+  });
+
+  it("po potvrzení spuštění stejné hry začne znovu s čistým průběhem", async () => {
+    window.history.pushState({}, "", "/play/riskuj-2026-06-06");
+
+    render(<App />);
+
+    const tile = await screen.findByRole("button", {
+      name: /Hudební otázky 1 za 1 000 Kč/i
+    });
+    fireEvent.click(tile);
+    expect(tile).toHaveAttribute("data-state", "selected");
+
+    fireEvent.click(screen.getByRole("button", { name: "Admin" }));
+    expect(await screen.findByLabelText("Editor hry")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Spustit novou hru" }));
+    expect(
+      screen.getByRole("alertdialog", { name: "Opravdu chcete začít novou hru?" })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ano" }));
+
+    expect(window.location.pathname).toBe("/play/riskuj-2026-06-06");
+    expect(
+      await screen.findByRole("button", { name: /Hudební otázky 1 za 1 000 Kč/i })
+    ).toHaveAttribute("data-state", "available");
+  });
 });

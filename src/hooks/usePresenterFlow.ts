@@ -2,6 +2,10 @@ import { useCallback, useMemo, useState } from "react";
 import type { CommonDenominatorItem, Game, MoneyValue, Round, RoundType } from "../types/game";
 import type { GameSession } from "../types/session";
 
+const UNDO_HISTORY_LIMIT = 10;
+
+type SessionUpdater = GameSession | ((current: GameSession) => GameSession);
+
 function createSession(game: Game): GameSession {
   return {
     gameId: game.id,
@@ -62,7 +66,41 @@ function commonDenominatorItem(
 }
 
 export function usePresenterFlow(game: Game) {
-  const [session, setSession] = useState(() => createSession(game));
+  const [flowState, setFlowState] = useState(() => ({
+    session: createSession(game),
+    undoHistory: [] as GameSession[]
+  }));
+  const session = flowState.session;
+  const canUndo = flowState.undoHistory.length > 0;
+
+  const setSession = useCallback((updater: SessionUpdater) => {
+    setFlowState((current) => {
+      const nextSession = typeof updater === "function" ? updater(current.session) : updater;
+
+      if (nextSession === current.session) {
+        return current;
+      }
+
+      return {
+        session: nextSession,
+        undoHistory: [current.session, ...current.undoHistory].slice(0, UNDO_HISTORY_LIMIT)
+      };
+    });
+  }, []);
+
+  const undo = useCallback(() => {
+    setFlowState((current) => {
+      const previousSession = current.undoHistory[0];
+      if (!previousSession) {
+        return current;
+      }
+
+      return {
+        session: previousSession,
+        undoHistory: current.undoHistory.slice(1)
+      };
+    });
+  }, []);
 
   const answerVisible = session.presenterStep === "answer-visible" || session.presenterStep === "scoring";
 
@@ -309,8 +347,10 @@ export function usePresenterFlow(game: Game) {
 
   return {
     session,
+    canUndo,
     answerVisible,
     activeRound,
+    undo,
     selectTeam,
     selectItem,
     reopenItemForCorrection,
@@ -327,5 +367,4 @@ export function usePresenterFlow(game: Game) {
     returnToBoard
   };
 }
-
 
