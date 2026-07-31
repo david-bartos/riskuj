@@ -60,10 +60,17 @@ let schemaReady: Promise<void> | undefined;
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
-      await ensureSchema(env.DB);
-
       const url = new URL(request.url);
       const { pathname } = url;
+      const isAudioUpload =
+        request.method === "POST" &&
+        (pathname === "/api/audio-assets" || pathname === "/api/uploads/audio");
+
+      if (isAudioUpload) {
+        return uploadAudio(request, env);
+      }
+
+      await ensureSchema(env.DB);
 
       if (request.method === "GET" && pathname === "/healthz") {
         return new Response("ok\n", {
@@ -94,13 +101,6 @@ export default {
 
       if (request.method === "GET" && pathname === "/api/audio-assets") {
         return listAudioAssets(env.DB);
-      }
-
-      if (
-        request.method === "POST" &&
-        (pathname === "/api/audio-assets" || pathname === "/api/uploads/audio")
-      ) {
-        return uploadAudio(request, env);
       }
 
       const uploadKey = readPathParameter(pathname, "/uploads/");
@@ -251,6 +251,8 @@ async function uploadAudio(request: Request, env: Env) {
   if (uploadError) {
     return json({ error: uploadError }, 400);
   }
+
+  await ensureSchema(env.DB);
 
   const id = crypto.randomUUID();
   const objectKey = `${id}.mp3`;

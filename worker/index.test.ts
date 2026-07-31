@@ -60,6 +60,7 @@ describe("produkční Worker upload", () => {
       error: "Only MP3 audio uploads are supported."
     });
     expect(env.UPLOADS.put).not.toHaveBeenCalled();
+    expect(env.DB.batch).not.toHaveBeenCalled();
     expect(statement.run).not.toHaveBeenCalled();
   });
 
@@ -79,6 +80,7 @@ describe("produkční Worker upload", () => {
       error: "MP3 file must not exceed 12 MB."
     });
     expect(env.UPLOADS.put).not.toHaveBeenCalled();
+    expect(env.DB.batch).not.toHaveBeenCalled();
     expect(statement.run).not.toHaveBeenCalled();
   });
 });
