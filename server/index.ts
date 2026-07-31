@@ -6,6 +6,12 @@ import { readFile, writeFile } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { AudioAsset, Game } from "../src/types/game";
+import {
+  getAudioUploadError,
+  INVALID_MP3_UPLOAD_ERROR,
+  MAX_MP3_FILE_SIZE_BYTES,
+  MP3_TOO_LARGE_ERROR
+} from "../src/audio/uploadPolicy";
 import { getSeedGame, listSeedGames } from "../src/data/games";
 import { assertValidGame, createEmptyGame, GameValidationError } from "./gameValidation";
 import { GamesRepository, isSafeGameId } from "./gamesRepository";
@@ -19,14 +25,13 @@ type CreateServerOptions = {
 
 interface AudioUploadRequest extends express.Request {
   generatedAudioId?: string;
-  generatedAudioExtension?: ".mp3" | ".wav";
+  generatedAudioExtension?: ".mp3";
 }
 
 const defaultUploadsDir = resolve(process.cwd(), "data", "uploads");
 const defaultAudioAssetsPath = resolve(process.cwd(), "data", "audio-assets.json");
 const defaultStaticDir = resolve(process.cwd(), "dist");
 const audioUploadRequiredMessage = 'Audio file is required in multipart field "file".';
-const invalidAudioMessage = "Only MP3 or WAV audio uploads are supported.";
 
 const asyncHandler =
   (handler: express.RequestHandler): express.RequestHandler =>
@@ -36,36 +41,6 @@ const asyncHandler =
 
 function createAudioId() {
   return randomUUID();
-}
-
-function audioExtension(file: Express.Multer.File): ".mp3" | ".wav" | undefined {
-  const originalName = file.originalname.toLowerCase();
-  if (
-    file.mimetype === "audio/mpeg" ||
-    file.mimetype === "audio/mp3" ||
-    originalName.endsWith(".mp3")
-  ) {
-    return ".mp3";
-  }
-
-  if (
-    file.mimetype === "audio/wav" ||
-    file.mimetype === "audio/wave" ||
-    file.mimetype === "audio/x-wav" ||
-    originalName.endsWith(".wav")
-  ) {
-    return ".wav";
-  }
-
-  return undefined;
-}
-
-function audioMimeType(extension: ".mp3" | ".wav") {
-  return extension === ".wav" ? "audio/wav" : "audio/mpeg";
-}
-
-function isAcceptedAudio(file: Express.Multer.File) {
-  return audioExtension(file) !== undefined;
 }
 
 function titleFromUpload(file: Express.Multer.File, formTitle: unknown) {
@@ -115,13 +90,24 @@ export function createServer(options: CreateServerOptions = {}) {
   }
 
   const upload = multer({
+    limits: {
+      // Busboy signals LIMIT_FILE_SIZE when the file reaches the limit, so the
+      // parser needs one extra byte to accept the inclusive 12 MB boundary.
+      fileSize: MAX_MP3_FILE_SIZE_BYTES + 1
+    },
     fileFilter: (_request, file, callback) => {
-      if (isAcceptedAudio(file)) {
+      const uploadError = getAudioUploadError({
+        name: file.originalname,
+        type: file.mimetype,
+        size: 0
+      });
+
+      if (!uploadError) {
         callback(null, true);
         return;
       }
 
-      callback(new Error(invalidAudioMessage));
+      callback(new Error(uploadError));
     },
     storage: multer.diskStorage({
       destination: (_request, _file, callback) => {
@@ -129,9 +115,9 @@ export function createServer(options: CreateServerOptions = {}) {
       },
       filename: (request: AudioUploadRequest, _file, callback) => {
         const audioId = createAudioId();
-        request.generatedAudioExtension = audioExtension(_file);
+        request.generatedAudioExtension = ".mp3";
         request.generatedAudioId = audioId;
-        callback(null, `${audioId}${request.generatedAudioExtension ?? ".mp3"}`);
+        callback(null, `${audioId}.mp3`);
       }
     })
   });
@@ -140,10 +126,15 @@ export function createServer(options: CreateServerOptions = {}) {
     return (request: AudioUploadRequest, response) => {
       upload.single("file")(request, response, (error: unknown) => {
         if (error) {
+          if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
+            response.status(400).json({ error: MP3_TOO_LARGE_ERROR });
+            return;
+          }
+
           response.status(400).json({
             error:
-              error instanceof Error && error.message === invalidAudioMessage
-                ? invalidAudioMessage
+              error instanceof Error && error.message === INVALID_MP3_UPLOAD_ERROR
+                ? INVALID_MP3_UPLOAD_ERROR
                 : audioUploadRequiredMessage
           });
           return;
@@ -161,7 +152,7 @@ export function createServer(options: CreateServerOptions = {}) {
           title,
           originalName: request.file.originalname,
           displayName: title,
-          mimeType: audioMimeType(request.generatedAudioExtension)
+          mimeType: "audio/mpeg"
         };
 
         void appendAudioAsset(asset)

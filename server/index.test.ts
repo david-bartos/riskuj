@@ -223,31 +223,52 @@ describe("server", () => {
     await expect(fs.readFile(savedPath)).resolves.toEqual(mp3Bytes);
   });
 
-  it("uloží WAV upload pod neprůhledným UUID src a vrátí AudioAsset", async () => {
+  it("odmítne WAV upload", async () => {
     const app = createTestServer();
-    const wavBytes = Buffer.from("RIFF test wav payload");
 
     const response = await request(app)
       .post("/api/uploads/audio")
-      .attach("file", wavBytes, {
+      .attach("file", Buffer.from("RIFF"), {
         contentType: "audio/wav",
         filename: "effect.wav"
       })
-      .expect(200);
+      .expect(400);
 
     expect(response.body).toEqual({
-      id: expect.stringMatching(/^[0-9a-f-]{36}$/),
-      src: expect.stringMatching(/^\/uploads\/[0-9a-f-]{36}\.wav$/),
-      title: "effect",
-      originalName: "effect.wav",
-      displayName: "effect",
-      mimeType: "audio/wav"
+      error: "Only MP3 audio uploads are supported."
     });
+    await expect(fs.readdir(uploadsDir)).resolves.toEqual([]);
+  });
 
-    const savedFilename = basename(response.body.src);
-    const savedPath = join(uploadsDir, savedFilename);
-    expect(existsSync(savedPath)).toBe(true);
-    await expect(fs.readFile(savedPath)).resolves.toEqual(wavBytes);
+  it("přijme MP3 o velikosti přesně 12 MB", async () => {
+    const app = createTestServer();
+
+    const response = await request(app)
+      .post("/api/uploads/audio")
+      .attach("file", Buffer.alloc(12_000_000), {
+        contentType: "audio/mpeg",
+        filename: "limit.mp3"
+      })
+      .expect(200);
+
+    expect(response.body.src).toMatch(/^\/uploads\/[0-9a-f-]{36}\.mp3$/);
+  });
+
+  it("odmítne MP3 o jeden bajt nad 12 MB", async () => {
+    const app = createTestServer();
+
+    const response = await request(app)
+      .post("/api/uploads/audio")
+      .attach("file", Buffer.alloc(12_000_001), {
+        contentType: "audio/mpeg",
+        filename: "too-large.mp3"
+      })
+      .expect(400);
+
+    expect(response.body).toEqual({
+      error: "MP3 file must not exceed 12 MB."
+    });
+    await expect(fs.readdir(uploadsDir)).resolves.toEqual([]);
   });
 
   it("persistuje audio knihovnu a podporuje kompatibilní /api/audio-assets endpoint", async () => {
@@ -299,7 +320,7 @@ describe("server", () => {
     expect(response.headers["content-type"]).toContain("application/json");
   });
 
-  it("vrátí 400 JSON error pro jiný než MP3/WAV upload", async () => {
+  it("vrátí 400 JSON error pro jiný než MP3 upload", async () => {
     const app = createTestServer();
 
     const response = await request(app)
@@ -311,7 +332,7 @@ describe("server", () => {
       .expect(400);
 
     expect(response.body).toEqual({
-      error: "Only MP3 or WAV audio uploads are supported."
+      error: "Only MP3 audio uploads are supported."
     });
     await expect(fs.readdir(uploadsDir)).resolves.toEqual([]);
   });
