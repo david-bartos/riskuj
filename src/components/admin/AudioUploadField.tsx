@@ -1,4 +1,9 @@
 import { useId, useRef, useState } from "react";
+import {
+  getAudioUploadError,
+  INVALID_MP3_UPLOAD_ERROR,
+  MP3_TOO_LARGE_ERROR
+} from "../../audio/uploadPolicy";
 import type { AudioAsset } from "../../types/game";
 
 type AudioUploadFieldProps = {
@@ -11,19 +16,6 @@ type AudioUploadFieldProps = {
 
 function getAudioLabel(audio: AudioAsset) {
   return audio.displayName ?? audio.title ?? audio.originalName ?? audio.src;
-}
-
-function isSupportedAudioFile(file: File) {
-  const lowerName = file.name.toLowerCase();
-  return (
-    file.type === "audio/mpeg" ||
-    file.type === "audio/mp3" ||
-    file.type === "audio/wav" ||
-    file.type === "audio/wave" ||
-    file.type === "audio/x-wav" ||
-    lowerName.endsWith(".mp3") ||
-    lowerName.endsWith(".wav")
-  );
 }
 
 export default function AudioUploadField({
@@ -51,8 +43,13 @@ export default function AudioUploadField({
       return;
     }
 
-    if (!isSupportedAudioFile(file)) {
-      setError("Nahrajte prosím soubor MP3 nebo WAV.");
+    const uploadError = getAudioUploadError(file);
+    if (uploadError === INVALID_MP3_UPLOAD_ERROR) {
+      setError("Nahrajte prosím soubor MP3.");
+      return;
+    }
+    if (uploadError === MP3_TOO_LARGE_ERROR) {
+      setError("MP3 soubor může mít maximálně 12 MB.");
       return;
     }
 
@@ -108,7 +105,7 @@ export default function AudioUploadField({
         <label className="field-stack" htmlFor={uploadId}>
           <span>Upload audio</span>
           <input
-            accept=".mp3,.wav"
+            accept=".mp3"
             id={uploadId}
             ref={inputRef}
             type="file"
