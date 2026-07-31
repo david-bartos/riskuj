@@ -141,18 +141,34 @@ describe("gamesClient", () => {
     expect(body.get("file")).toBe(file);
   });
 
-  it("mapuje backend chybu pro jiný než MP3/WAV soubor do češtiny", async () => {
+  it("mapuje backend chybu pro jiný než MP3 soubor do češtiny", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
-        jsonResponse({ error: "Only MP3 or WAV audio uploads are supported." }, { status: 400 })
+        jsonResponse({ error: "Only MP3 audio uploads are supported." }, { status: 400 })
       )
     );
 
     await expect(
       uploadAudio(new File(["x"], "notes.txt", { type: "text/plain" }))
     ).rejects.toMatchObject({
-      message: "Nahrajte prosím soubor MP3 nebo WAV.",
+      message: "Nahrajte prosím soubor MP3.",
+      status: 400
+    });
+  });
+
+  it("mapuje překročení 12 MB do češtiny", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({ error: "MP3 file must not exceed 12 MB." }, { status: 400 })
+      )
+    );
+
+    await expect(
+      uploadAudio(new File(["ID3"], "large.mp3", { type: "audio/mpeg" }))
+    ).rejects.toMatchObject({
+      message: "MP3 soubor může mít maximálně 12 MB.",
       status: 400
     });
   });

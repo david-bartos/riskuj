@@ -48,20 +48,48 @@ describe("AudioUploadField", () => {
     });
 
     expect(onUploadAudio).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toHaveTextContent("Nahrajte prosím soubor MP3 nebo WAV.");
+    expect(screen.getByRole("alert")).toHaveTextContent("Nahrajte prosím soubor MP3.");
   });
 
-  it("nahraje MP3 nebo WAV, zobrazí průběh a předá vrácený AudioAsset", async () => {
+  it("odmítne WAV bez volání uploadu", () => {
+    const { onUploadAudio } = renderField();
+    fireEvent.change(screen.getByLabelText("Upload audio"), {
+      target: { files: [new File(["RIFF"], "intro.wav", { type: "audio/wav" })] }
+    });
+
+    expect(onUploadAudio).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent("Nahrajte prosím soubor MP3.");
+  });
+
+  it("odmítne MP3 větší než 12 MB bez volání uploadu", () => {
+    const { onUploadAudio } = renderField();
+    const file = new File(
+      [new Uint8Array(12_000_001)],
+      "intro.mp3",
+      { type: "audio/mpeg" }
+    );
+
+    fireEvent.change(screen.getByLabelText("Upload audio"), {
+      target: { files: [file] }
+    });
+
+    expect(onUploadAudio).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "MP3 soubor může mít maximálně 12 MB."
+    );
+  });
+
+  it("nahraje MP3, zobrazí průběh a předá vrácený AudioAsset", async () => {
     const pendingUpload = new Promise<AudioAsset>((resolve) => {
       setTimeout(() => resolve(asset), 0);
     });
     const onUploadAudio = vi.fn().mockReturnValue(pendingUpload);
     const onChange = vi.fn();
     renderField({ onUploadAudio, onChange });
-    const file = new File(["RIFF"], "intro.wav", { type: "audio/wav" });
+    const file = new File(["ID3"], "intro.mp3", { type: "audio/mpeg" });
     const input = screen.getByLabelText("Upload audio");
 
-    expect(input).toHaveAttribute("accept", ".mp3,.wav");
+    expect(input).toHaveAttribute("accept", ".mp3");
 
     fireEvent.change(input, {
       target: { files: [file] }

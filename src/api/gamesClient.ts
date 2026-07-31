@@ -1,5 +1,6 @@
 import type { AudioAsset, Game, GameSummary } from "../types/game";
 export type { GameSummary } from "../types/game";
+import { INVALID_MP3_UPLOAD_ERROR, MP3_TOO_LARGE_ERROR } from "../audio/uploadPolicy";
 import { getSeedGame, seedGames } from "../data/games";
 
 export class GamesClientError extends Error {
@@ -174,11 +175,12 @@ function createHttpError(response: Response, body: unknown) {
 
 function createUploadError(response: Response, body: unknown) {
   if (isBackendError(body)) {
-    if (
-      body.error === "Only MP3 or WAV audio uploads are supported." ||
-      body.error === "Only MP3 audio uploads are supported."
-    ) {
-      return new GamesClientError("Nahrajte prosím soubor MP3 nebo WAV.", response.status);
+    if (body.error === INVALID_MP3_UPLOAD_ERROR) {
+      return new GamesClientError("Nahrajte prosím soubor MP3.", response.status);
+    }
+
+    if (body.error === MP3_TOO_LARGE_ERROR) {
+      return new GamesClientError("MP3 soubor může mít maximálně 12 MB.", response.status);
     }
 
     if (
