@@ -1,4 +1,5 @@
 import { getSeedGame, listSeedGames } from "../src/data/games";
+import { getAudioUploadError } from "../src/audio/uploadPolicy";
 import type { AudioAsset, Game, GameSummary } from "../src/types/game";
 import {
   assertValidGame,
@@ -54,7 +55,6 @@ type AudioAssetRow = {
 const gameIdPattern = /^[a-zA-Z0-9_-]+$/;
 const audioKeyPattern = /^[a-f0-9-]+\.(mp3|wav)$/;
 const audioUploadRequiredMessage = 'Audio file is required in multipart field "file".';
-const invalidAudioMessage = "Only MP3 or WAV audio uploads are supported.";
 let schemaReady: Promise<void> | undefined;
 
 export default {
@@ -247,15 +247,15 @@ async function uploadAudio(request: Request, env: Env) {
     return json({ error: audioUploadRequiredMessage }, 400);
   }
 
-  const extension = audioExtension(file);
-  if (!extension) {
-    return json({ error: invalidAudioMessage }, 400);
+  const uploadError = getAudioUploadError(file);
+  if (uploadError) {
+    return json({ error: uploadError }, 400);
   }
 
   const id = crypto.randomUUID();
-  const objectKey = `${id}${extension}`;
+  const objectKey = `${id}.mp3`;
   const title = titleFromUpload(file, formData.get("title") ?? formData.get("displayName"));
-  const mimeType = extension === ".wav" ? "audio/wav" : "audio/mpeg";
+  const mimeType = "audio/mpeg";
   const asset: AudioAsset = {
     id,
     src: `/uploads/${objectKey}`,
@@ -312,33 +312,13 @@ function createGameSummary(game: Game): GameSummary {
   };
 }
 
-function audioExtension(file: File): ".mp3" | ".wav" | undefined {
-  const filename = file.name.toLowerCase();
-  const type = file.type.toLowerCase();
-
-  if (type === "audio/mpeg" || type === "audio/mp3" || filename.endsWith(".mp3")) {
-    return ".mp3";
-  }
-
-  if (
-    type === "audio/wav" ||
-    type === "audio/wave" ||
-    type === "audio/x-wav" ||
-    filename.endsWith(".wav")
-  ) {
-    return ".wav";
-  }
-
-  return undefined;
-}
-
 function titleFromUpload(file: File, formTitle: FormDataEntryValue | null) {
   const title = typeof formTitle === "string" ? formTitle.trim() : "";
   if (title) {
     return title;
   }
 
-  return file.name.replace(/\.(mp3|wav)$/i, "");
+  return file.name.replace(/\.mp3$/i, "");
 }
 
 function audioMimeTypeFromKey(key: string) {
